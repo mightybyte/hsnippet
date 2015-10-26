@@ -1,6 +1,6 @@
 name:                hsnippet-frontend
 version:             0.1
-license:             GPL
+license:             BSD3
 author:              Doug Beardsley, Greg Hale
 category:            Web
 build-type:          Simple
