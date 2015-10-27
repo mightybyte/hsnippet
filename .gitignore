@@ -1,0 +1,10 @@
+dist
+*.o
+*.hi
+*.swp
+.cabal-sandbox
+cabal.sandbox.config
+log
+hsnippet.js
+site_key.txt
+users.json

@@ -16,19 +16,22 @@ executable main
     aeson,
     bytestring,
     containers,
-    errors           >= 2.0 && < 2.1,
+    errors             >= 2.0 && < 2.1,
+    heist              >= 1.0 && < 1.1,
     lens,
     mtl,
     random,
     readable,
     rng-utils,
-    snap             >= 1.0 && < 1.1,
-    snap-core        >= 1.0 && < 1.1,
+    snap               >= 1.0 && < 1.1,
+    snap-core          >= 1.0 && < 1.1,
+    snap-loader-static >= 1.0 && < 1.1,
+    snap-server        >= 1.0 && < 1.1,
     string-conv,
     text,
-    transformers,
-    websockets,
-    websockets-snap >= 1.0.0.0 && < 1.1
+    transformers
+    -- websockets,
+    -- websockets-snap >= 1.0.0.0 && < 1.1
   if impl(ghc >= 7.8)
     build-depends: base >= 4.7 && < 5
   else

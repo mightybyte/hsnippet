@@ -1,9 +1,21 @@
-[submodule "deps/servant-snap"]
-	path = deps/servant-snap
-	url = http://github.com/haskell-servant/servant-snap
 [submodule "deps/snaplet-postgresql-simple"]
 	path = deps/snaplet-postgresql-simple
 	url = http://github.com/mightybyte/snaplet-postgresql-simple
 [submodule "deps/websockets-snap"]
 	path = deps/websockets-snap
 	url = http://github.com/imalsogreg/websockets-snap
+[submodule "deps/reflex-platform"]
+	path = deps/reflex-platform
+	url = https://github.com/ryantrinkle/try-reflex.git
+[submodule "deps/reflex-dom-contrib"]
+	path = deps/reflex-dom-contrib
+	url = https://github.com/reflex-frp/reflex-dom-contrib.git
+[submodule "deps/snap"]
+	path = deps/snap
+	url = https://github.com/snapframework/snap.git
+[submodule "deps/snap-loader-static"]
+	path = deps/snap-loader-static
+	url = https://github.com/snapframework/snap-loader-static.git
+[submodule "deps/snap-loader-dynamic"]
+	path = deps/snap-loader-dynamic
+	url = https://github.com/snapframework/snap-loader-dynamic.git

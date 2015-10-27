@@ -15,7 +15,6 @@ executable hsnippet-frontend
       aeson
     , attoparsec
     , base
-    , base64-bytestring
     , bifunctors
     , bytestring
     , cereal
@@ -25,7 +24,6 @@ executable hsnippet-frontend
     , dependent-map
     , dependent-sum
     , errors
-    , formattable
     , generic-deriving
     , ghcjs-dom
     , hashable
