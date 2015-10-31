@@ -4,26 +4,33 @@
 -- | This module is where all the routes and handlers are defined for your
 -- site. The 'app' function is the initializer that combines everything
 -- together and is exported by this module.
-module Site
+module HSnippet.Site
   ( app
   ) where
 
 ------------------------------------------------------------------------------
 import           Control.Applicative
+import           Control.Monad.Logger
+import           Control.Monad.Trans
 import           Data.ByteString (ByteString)
-import           Data.Monoid
+import qualified Data.Configurator as C
+import           Data.String.Conv
 import qualified Data.Text as T
+import           Database.Groundhog
+import           Database.Groundhog.Core
+import           Database.Groundhog.Postgresql
 import           Snap.Core
 import           Snap.Snaplet
 import           Snap.Snaplet.Auth
 import           Snap.Snaplet.Auth.Backends.JsonFile
 import           Snap.Snaplet.Heist
+import           Snap.Snaplet.PostgresqlSimple (getConnectionString)
 import           Snap.Snaplet.Session.Backends.CookieSession
 import           Snap.Util.FileServe
-import           Heist
-import qualified Heist.Compiled as C
 ------------------------------------------------------------------------------
-import           Application
+import           HSnippet.Types.App
+import           HSnippet.Shared.Types.Snippet
+------------------------------------------------------------------------------
 
 
 ------------------------------------------------------------------------------
@@ -67,6 +74,11 @@ routes = [ ("/login",    with auth handleLoginSubmit)
          ]
 
 
+migrateDB :: (MonadIO m, PersistBackend m) => m ()
+migrateDB = do
+    runMigration $ do
+      migrate (undefined :: Snippet)
+
 ------------------------------------------------------------------------------
 -- | The application initializer.
 app :: SnapletInit App App
@@ -82,5 +94,13 @@ app = makeSnaplet "app" "An snaplet example application." Nothing $ do
            initJsonFileAuthManager defAuthSettings sess "users.json"
     addRoutes routes
     addAuthSplices h auth
-    return $ App h s a
+
+
+    conf <- getSnapletUserConfig
+    let cfg = C.subconfig "postgres" conf
+    connstr <- liftIO $ getConnectionString cfg
+    ghPool <- liftIO $ withPostgresqlPool (toS connstr) 3 return
+    liftIO $ runNoLoggingT (withConn (runDbPersist migrateDB) ghPool)
+
+    return $ App h s a ghPool
 

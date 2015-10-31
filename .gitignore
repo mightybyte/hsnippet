@@ -2,6 +2,7 @@ dist
 *.o
 *.hi
 *.swp
+*.cfg
 .cabal-sandbox
 cabal.sandbox.config
 log

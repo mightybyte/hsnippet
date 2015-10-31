@@ -1,0 +1,14 @@
+# This template file is here to avoid developers clobbering each others config
+# files.  To get up and running copy this file to devel.cfg and customize that
+# file as needed.
+
+postgres {
+  host = "localhost"
+  dbname = "hsnippet"
+  user = "mightybyte"
+  pass = ""
+  port = 5432
+  numStripes = 1
+  idleTime = 5
+  maxResourcesPerStripe = 3
+}
