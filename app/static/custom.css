@@ -1,8 +1,6 @@
-// Custom css here
+/* Custom css here */
 
-// Seems to not be working
-
-form.ui.form>.field>textarea#code {
+.full-height {
     height: 100% !important;
     max-height: 100% !important;
 }

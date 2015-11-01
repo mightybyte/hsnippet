@@ -1,7 +1,7 @@
 <apply template="base">
 
   <ifLoggedIn>
-    <div id="hsnippet-app" style="height:100%">
+    <div id="hsnippet-app" class="full-height">
     </div>
 
     <script src="/hsnippet.js"></script>

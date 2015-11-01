@@ -5,18 +5,18 @@
   </div>
 </div>
 <div class="ui two column padded grid" style="height: calc(100% - 40px)">
-  <div class="left column" style="height: 100%">
-    <form class="ui form" style="height: 100%">
+  <div class="left column full-height">
+    <form class="ui form full-height">
       <div class="field">
         <input type="text" placeholder="Snippet Name"/>
       </div>
       <div class="field" style="height: calc(100% - 52px)">
-        <textarea id="code" placeholder="Enter your reflex code here" style="height:100%; max-height:100%">
+        <textarea class="full-height"  placeholder="Enter your reflex code here">
         </textarea>
       </div>
     </form>
   </div>
-  <div class="grey right column" style="height: 100%">
+  <div class="grey right column full-height">
     <p>Some text here</p>
   </div>
 </div>

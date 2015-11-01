@@ -34,19 +34,17 @@ menu = do
 
 leftColumn :: MonadWidget t m => m ()
 leftColumn = do
-    fullHeight "div" "left column" $
-      fullHeight "form" "ui form" $ do
+    divClass "left column full-height" $
+      elClass "form" "ui form full-height" $ do
         divClass "field" $
           elAttr "input" ("type" =: "text" <> "placeholder" =: "Snippet Name") blank
         elAttr "div" ("class" =: "field" <>
                       "style" =: "height: calc(100% - 52px)") $ do
-          fullHeight "textarea" "snippet-code" blank
+          elClass "textarea" "full-height" blank
 
 rightColumn :: MonadWidget t m => m ()
 rightColumn = do
-    fullHeight "div" "grey right column" $ do
+    divClass "grey right column full-height" $ do
       el "p" $ text "This is where the snippet's output will go."
 
 
-fullHeight :: MonadWidget t m => String -> String -> m a -> m a
-fullHeight e cls = elAttr e ("class" =: cls <> "style" =: "height:100%; max-height:100%")
