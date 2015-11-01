@@ -10,11 +10,15 @@ module HSnippet.Site
 
 ------------------------------------------------------------------------------
 import           Control.Applicative
+import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.Trans
 import           Data.ByteString (ByteString)
-import qualified Data.Configurator as C
+import           Data.Configurator
+import           Data.Configurator.Types
+import           Data.Monoid
 import           Data.String.Conv
+import           Data.Text (Text)
 import qualified Data.Text as T
 import           Database.Groundhog
 import           Database.Groundhog.Core
@@ -28,6 +32,7 @@ import           Snap.Snaplet.PostgresqlSimple (getConnectionString)
 import           Snap.Snaplet.Session.Backends.CookieSession
 import           Snap.Util.FileServe
 ------------------------------------------------------------------------------
+import           HSnippet.Reload
 import           HSnippet.Types.App
 import           HSnippet.Shared.Types.Snippet
 ------------------------------------------------------------------------------
@@ -67,10 +72,11 @@ handleNewUser = method GET handleForm <|> method POST handleFormSubmit
 ------------------------------------------------------------------------------
 -- | The application's routes.
 routes :: [(ByteString, Handler App App ())]
-routes = [ ("/login",    with auth handleLoginSubmit)
-         , ("/logout",   with auth handleLogout)
-         , ("/new_user", with auth handleNewUser)
-         , ("",          serveDirectory "static")
+routes = [ ("/login",      with auth handleLoginSubmit)
+         , ("/logout",     with auth handleLogout)
+         , ("/new_user",   with auth handleNewUser)
+         , ("heistReload", failIfNotLocal $ with heist heistReloader)
+         , ("",            serveDirectory "static")
          ]
 
 
@@ -78,6 +84,24 @@ migrateDB :: (MonadIO m, PersistBackend m) => m ()
 migrateDB = do
     runMigration $ do
       migrate (undefined :: Snippet)
+
+------------------------------------------------------------------------------
+lookupFail
+    :: (Show b, Configured b)
+    => String
+    -- ^ A default value
+    -> Config
+    -> Text
+    -- ^ Key beeing looked up
+    -> IO b
+lookupFail def cfg key = do
+    val <- lookupDefault (error msg) cfg key
+    putStrLn $ "Configured " <> T.unpack key <> " = " <> show val
+    return val
+  where
+    msg = "Missing config option " <> T.unpack key <>
+          "! (usually defaults to \"" <> def <> "\")"
+
 
 ------------------------------------------------------------------------------
 -- | The application initializer.
@@ -97,10 +121,15 @@ app = makeSnaplet "app" "An snaplet example application." Nothing $ do
 
 
     conf <- getSnapletUserConfig
-    let cfg = C.subconfig "postgres" conf
+    let cfg = subconfig "postgres" conf
     connstr <- liftIO $ getConnectionString cfg
     ghPool <- liftIO $ withPostgresqlPool (toS connstr) 3 return
     liftIO $ runNoLoggingT (withConn (runDbPersist migrateDB) ghPool)
+
+    -- See if we need to enable heist autoreloading
+    -- Commented out because for some reason it's not working
+    --ar <- liftIO $ lookupFail "true" conf "autoreload-templates"
+    --when ar $ liftIO $ autoReloadHeist "/heistReload" ["snaplets/heist"]
 
     return $ App h s a ghPool
 

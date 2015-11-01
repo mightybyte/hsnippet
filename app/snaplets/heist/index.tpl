@@ -1,11 +1,14 @@
 <apply template="base">
 
   <ifLoggedIn>
-    <div id="hsnippet-app">
-      <p>Congrats!  You're logged in as '<loggedInUser/>'</p>
+    <div id="hsnippet-app" style="height:100%">
     </div>
 
-    <p><a href="/logout">Logout</a></p>
+    <script src="/hsnippet.js"></script>
+
+    <ignore>
+    <apply template="mockup"/>
+    </ignore>
   </ifLoggedIn>
 
   <ifLoggedOut>

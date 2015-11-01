@@ -12,3 +12,5 @@ postgres {
   idleTime = 5
   maxResourcesPerStripe = 3
 }
+
+autoreload-templates = false
