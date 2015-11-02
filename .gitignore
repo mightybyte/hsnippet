@@ -6,6 +6,11 @@ dist
 .cabal-sandbox
 cabal.sandbox.config
 log
-hsnippet.js
+frontend/hsnippet.js
+frontend/rts.js
+frontend/lib.js
 site_key.txt
 users.json
+tags
+TAGS
+sandbox/snippets

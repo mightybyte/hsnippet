@@ -1,5 +1,19 @@
 /* Custom css here */
 
+iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.editInPlace.viewing {
+    cursor: pointer;
+}
+
+.inverted.menu .item .editInPlace.editing input {
+    color: black;
+}
+
 .full-height {
     height: 100% !important;
     max-height: 100% !important;

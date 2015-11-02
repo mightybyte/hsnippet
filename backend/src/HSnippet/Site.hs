@@ -32,6 +32,7 @@ import           Snap.Snaplet.PostgresqlSimple (getConnectionString)
 import           Snap.Snaplet.Session.Backends.CookieSession
 import           Snap.Util.FileServe
 ------------------------------------------------------------------------------
+import           HSnippet.BuildSnippet
 import           HSnippet.Reload
 import           HSnippet.Types.App
 import           HSnippet.Shared.Types.Snippet
@@ -72,10 +73,12 @@ handleNewUser = method GET handleForm <|> method POST handleFormSubmit
 ------------------------------------------------------------------------------
 -- | The application's routes.
 routes :: [(ByteString, Handler App App ())]
-routes = [ ("/login",      with auth handleLoginSubmit)
-         , ("/logout",     with auth handleLogout)
-         , ("/new_user",   with auth handleNewUser)
+routes = [ ("login",       with auth handleLoginSubmit)
+         , ("logout",      with auth handleLogout)
+         , ("new_user",    with auth handleNewUser)
          , ("heistReload", failIfNotLocal $ with heist heistReloader)
+         , ("run",         ghcjsBuildHandler)
+         , ("snippets",    serveDirectory "snippets")
          , ("",            serveDirectory "static")
          ]
 
