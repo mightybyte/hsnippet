@@ -24,8 +24,9 @@ if ! command -v nix-shell >/dev/null ; then
 fi
 
 nix-shell -A env --pure -j 8 -I ../deps --command "$BUILD_IT"
-#cat $SNIPPET_DIR/Main.jsexe/out.js $SNIPPET_DIR/Main.jsexe/runmain.js > $SNIPPET_DIR/out.js
-cp $SNIPPET_DIR/Main.jsexe/all.js $SNIPPET_DIR/out.js
+cat $SNIPPET_DIR/Main.jsexe/out.js $SNIPPET_DIR/Main.jsexe/runmain.js > $SNIPPET_DIR/out.js
+cp $SNIPPET_DIR/Main.jsexe/rts.js $SNIPPET_DIR
+cp $SNIPPET_DIR/Main.jsexe/lib.js $SNIPPET_DIR
 gzip -k $SNIPPET_DIR/out.js
 #rm -fr $SNIPPET_DIR/Main.jsexe $SNIPPET_DIR/dist
 cp template.html $SNIPPET_DIR/index.html

@@ -28,6 +28,7 @@ writeJSON a = do
 
 ghcjsBuildHandler :: Handler App App ()
 ghcjsBuildHandler = do
+    setTimeout 300
     mbs <- getParam "snippet"
     case decode . toS =<< mbs of
       Just (String t) -> do

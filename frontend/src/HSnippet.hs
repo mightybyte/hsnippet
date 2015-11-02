@@ -92,8 +92,17 @@ leftColumn = do
       elClass "form" "ui form full-height" $ do
         elAttr "div" ("class" =: "field" <>
                       "style" =: "height: 100%") $ do
-          textArea $ def & attributes .~ (constDyn $ "class" =: "full-height")
+          textArea $ def & attributes .~ (constDyn $ "class" =: "code full-height")
+                         & textAreaConfig_initialValue .~ example
     return $ Snippet (value ta)
+  where
+    --example = "main = appMain $ text \"aoeu\""
+    example = unlines
+      [ "main = appMain $ do"
+      , "  rec str <- holdDyn \"Click to edit me\" edits"
+      , "      edits <- editInPlace (constant True) str"
+      , "  return ()"
+      ]
 
 rightColumn :: MonadWidget t m => Output t -> m ()
 rightColumn out = do
@@ -112,7 +121,8 @@ setTabFromBuildStatus Building = ConsoleTab
 setTabFromBuildStatus BuildFailed = ConsoleTab
 setTabFromBuildStatus (Built br) =
     if brSuccess br
-      then AppTab
+      -- TODO Switch to AppTab when we have better failure detection
+      then ConsoleTab
       else ConsoleTab
 
 instance MonadWidget t m => Tab t m OutputTab where

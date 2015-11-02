@@ -1,5 +1,9 @@
 /* Custom css here */
 
+textarea.code {
+    font-family: monospace;
+}
+
 iframe {
     width: 100%;
     height: 100%;
