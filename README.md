@@ -12,14 +12,14 @@
 
 ## Directory Structure
 
-/app          - The directory from which you run the backend server
-/backend      - Cabal project for the backend web server
-/deps         - Git submodules for dependencies not available on hackage
-/frontend     - Frontend Haskell code that gets compiled to js with build.sh
-/hsnippet-lib - Small library of functionality provided to snippets
-/sandbox      - Sandbox where snippets are built
-/shared       - Code needed by both the backend and frontend
-/static       - Static resources
+    /app          - The directory from which you run the backend server
+    /backend      - Cabal project for the backend web server
+    /deps         - Git submodules for dependencies not available on hackage
+    /frontend     - Frontend Haskell code that gets compiled to js with build.sh
+    /hsnippet-lib - Small library of functionality provided to snippets
+    /sandbox      - Sandbox where snippets are built
+    /shared       - Code needed by both the backend and frontend
+    /static       - Static resources
 
 The above mentioned Makefile concatenates CSS and JS in /static and puts the
 output in app so pages don't need to depend on a bunch of separate files.
