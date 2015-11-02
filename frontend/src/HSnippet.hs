@@ -116,14 +116,13 @@ showTab :: OutputTab -> String
 showTab ConsoleTab = "Console"
 showTab AppTab = "App"
 
-setTabFromBuildStatus NotBuilt = ConsoleTab
-setTabFromBuildStatus Building = ConsoleTab
-setTabFromBuildStatus BuildFailed = ConsoleTab
+setTabFromBuildStatus :: BuildStatus -> OutputTab
 setTabFromBuildStatus (Built br) =
     if brSuccess br
       -- TODO Switch to AppTab when we have better failure detection
       then ConsoleTab
       else ConsoleTab
+setTabFromBuildStatus _ = ConsoleTab
 
 instance MonadWidget t m => Tab t m OutputTab where
     tabIndicator t active = do
@@ -138,7 +137,7 @@ rightTabs Output{..} = do
       tabBar ConsoleTab [ConsoleTab, AppTab] never
              (setTabFromBuildStatus <$> updated buildStatus)
     tabPane tabAttrs curTab ConsoleTab $ do
-      divClass "grey segment full-height" $ do
+      divClass "grey segment full-height console-out" $ do
         widgetHoldHelper consoleOutput NotBuilt $ updated buildStatus
     tabPane tabAttrs curTab AppTab $ do
       divClass "segment full-height" $ do

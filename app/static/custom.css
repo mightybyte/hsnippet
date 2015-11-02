@@ -1,5 +1,9 @@
 /* Custom css here */
 
+.console-out {
+    overflow: auto;
+}
+
 textarea.code {
     font-family: monospace;
 }
