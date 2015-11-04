@@ -40,7 +40,7 @@ ghcjsBuildHandler = do
                 then return ("Snippet already built", "", True)
                 else do
                   createDirectoryIfMissing True (sbRoot sb)
-                  copyFile "../sandbox/template.hs" (sbMain sb)
+                  copyFile "sandbox/template.hs" (sbMain sb)
                   T.appendFile (sbMain sb) t
                   (code, out, err) <- buildSnippet sb
                   return (out, err, code == ExitSuccess)
@@ -59,7 +59,7 @@ sbName :: SnippetBlob -> String
 sbName SnippetBlob{..} = "Snippet_" ++ showDigest sbHash
 
 sbRoot :: SnippetBlob -> String
-sbRoot sb = "../sandbox/snippets/" ++ sbName sb
+sbRoot sb = "sandbox/snippets/" ++ sbName sb
 
 sbMain :: SnippetBlob -> String
 sbMain sb = sbRoot sb </> "Main.hs"
@@ -71,6 +71,6 @@ sbJsOut sb = sbRoot sb </> "out.js.gz"
 buildSnippet :: SnippetBlob -> IO (ExitCode, String, String)
 buildSnippet sb = do
     putStrLn $ "Building " ++ sbName sb
-    let cp = (proc "../sandbox/build-snippet.sh" [sbName sb])
-               { cwd = Just "../sandbox" }
+    let cp = (proc "./build-snippet.sh" [sbName sb])
+               { cwd = Just "sandbox" }
     readCreateProcessWithExitCode cp ""

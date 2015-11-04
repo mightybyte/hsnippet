@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/usr/bin/env bash
+
+echo build-snippet.sh is running >> run-record.txt
 
 SNIPPET_DIR="snippets/$1"
 OUT_DIR="$SNIPPET_DIR/dist"

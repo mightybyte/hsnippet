@@ -1,11 +1,8 @@
 { haskellPackages, fetchgit, extraBuildInputs ? [] }:
 haskellPackages.mkDerivation {
-  pname = "hsnippet-frontend";
+  pname = "hsnippet-builder";
   version = "0.1";
   src = ./.;
-  preConfigure = ''
-    ln -sfT "${../shared/src}" ./src-shared
-  '';
   isExecutable = true;
   isLibrary = false;
   buildDepends = with haskellPackages; [

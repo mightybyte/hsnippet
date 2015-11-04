@@ -78,7 +78,7 @@ routes = [ ("login",       with auth handleLoginSubmit)
          , ("new_user",    with auth handleNewUser)
          , ("heistReload", failIfNotLocal $ with heist heistReloader)
          , ("run",         ghcjsBuildHandler)
-         , ("snippets",    serveDirectory "snippets")
+         , ("snippets",    serveDirectory "sandbox/snippets")
          , ("",            serveDirectory "static")
          ]
 
