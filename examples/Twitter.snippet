@@ -1,0 +1,14 @@
+main = appMain twitter
+
+twitter :: MonadWidget t m => m ()
+twitter = do
+  rec ta <- textArea $ def & setValue .~ ("" <$ click)
+                           & attributes .~ (constDyn $ "maxlength" =: "140")
+      click <- button "Send Tweet"
+  el "div" $
+    display =<< mapDyn length (value ta)
+  tweets <- foldDyn (:) [] $ tag (current $ value ta) click
+  el "ul" $ do
+    dyn =<< mapDyn (mapM_ (\t -> el "li" $ text t)) tweets
+    blank
+
