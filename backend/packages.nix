@@ -7,7 +7,7 @@
 , transformers
 }:
 mkDerivation {
-  pname = "hsnippet";
+  pname = "hsnippet-backend";
   version = "0.1";
   src = ./.;
   isLibrary = false;
