@@ -12,6 +12,7 @@ in nixpkgs.stdenv.mkDerivation (rec {
   backend = import ./backend { nixpkgs = reflex-platform.nixpkgs; };
   frontend = import ./frontend { inherit reflex-platform; };
   develCfgTemplate = ./app/devel.cfg.template;
+  buildEnv = (import ./frontend/default.nix {}).env.nativeBuildInputs;
   builder = builtins.toFile "builder.sh" ''
     source "$stdenv/setup"
 
@@ -27,6 +28,7 @@ in nixpkgs.stdenv.mkDerivation (rec {
     mkdir -p "$out/deps"
     ln -s "$deps/reflex-dom-contrib" "$out/deps/reflex-dom-contrib"
     ln -s "$deps/reflex-platform" "$out/deps/reflex-platform"
+    echo "$buildEnv" >"$out/buildEnv"
 
     rm -f "$out/static/rts.js"
     rm -f "$out/static/lib.js"
