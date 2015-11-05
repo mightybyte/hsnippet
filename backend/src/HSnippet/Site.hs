@@ -67,8 +67,11 @@ handleNewUser :: Handler App (AuthManager App) ()
 handleNewUser = method GET handleForm <|> method POST handleFormSubmit
   where
     handleForm = render "new_user"
-    handleFormSubmit = registerUser "login" "password" >> redirect "/"
-
+    handleFormSubmit = do
+        registerUser "login" "password"
+        loginUser "login" "password" Nothing
+                  (\_ -> handleLogin err) (redirect "/")
+    err = Just "Unknown user or password"
 
 ------------------------------------------------------------------------------
 -- | The application's routes.

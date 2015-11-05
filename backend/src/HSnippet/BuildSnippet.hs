@@ -38,7 +38,10 @@ ghcjsBuildHandler = do
               putStrLn $ "Exists " ++ show exists ++ ": " ++ sbJsOut sb
               if exists
                 then do
-                  out <- readFile $ sbOutput sb
+                  outExists <- doesFileExist $ sbOutput sb
+                  out <- if outExists
+                           then readFile $ sbOutput sb
+                           else return "No output"
                   success <- doesFileExist $ sbRoot sb </> "success"
                   return (out, success)
                 else do
