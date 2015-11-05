@@ -4,6 +4,7 @@
 module HSnippet.BuildSnippet where
 
 ------------------------------------------------------------------------------
+import           Control.Monad
 import           Control.Monad.Trans
 import           Data.Aeson
 import           Data.Digest.Pure.SHA
@@ -39,17 +40,23 @@ ghcjsBuildHandler = do
               if exists
                 then do
                   out <- getOutput sb
-                  success <- doesFileExist $ sbRoot sb </> "success"
+                  success <- getSuccess sb
+                  when (not success) $ removeDirectoryRecursive $ sbRoot sb
                   return (out, success)
                 else do
                   createDirectoryIfMissing True (sbRoot sb)
                   copyFile "sandbox/template.hs" (sbMain sb)
                   T.appendFile (sbMain sb) t
-                  (code, _, _) <- buildSnippet sb
-                  putStrLn $ "Got code " ++ show code
+                  -- code no longer used for anything
+                  (code, o, e) <- buildSnippet sb
+                  writeFile (sbRoot sb </> "run-stdout.txt") o
+                  writeFile (sbRoot sb </> "run-stderr.txt") e
                   out <- getOutput sb
-                  return (out, code == ExitSuccess)
-          writeJSON $ BuildResults (sbName sb) out success
+                  success <- getSuccess sb
+                  return (out, success)
+          let br = BuildResults (sbName sb) out success
+          liftIO $ putStrLn $ "Returning " ++ show br
+          writeJSON br
       _ -> writeJSON $ String "<h2 class='red'>Error: no data</h2>"
 
 data SnippetBlob = SnippetBlob
@@ -75,6 +82,9 @@ sbMain sb = sbRoot sb </> "Main.hs"
 -- NOTE: This must match the output file in sandbox/build-snippet.sh
 sbJsOut :: SnippetBlob -> String
 sbJsOut sb = sbRoot sb </> "out.js.gz"
+
+getSuccess :: SnippetBlob -> IO Bool
+getSuccess sb = doesFileExist $ sbRoot sb </> "success"
 
 getOutput :: SnippetBlob -> IO String
 getOutput sb = do

@@ -49,7 +49,7 @@ appController
     -> m (Output t)
 appController mData inData = do
     newCode <- buildCode $ tagDyn (snippetCode inData) (runEvent mData)
-    code <- holdDyn Nothing $ traceEvent "newCode" newCode
+    code <- holdDyn Nothing $ traceEvent "newCode2" newCode
     status <- holdDyn NotBuilt $ leftmost
       [ Building <$ runEvent mData
       , maybe BuildFailed Built <$> updated code

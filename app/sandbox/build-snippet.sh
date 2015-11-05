@@ -25,11 +25,9 @@ if ! command -v nix-shell >/dev/null ; then
   . ~/.nix-profile/etc/profile.d/nix.sh
 fi
 
-nix-shell -A env --pure -j 8 -I ../deps --command "$BUILD_IT"
-RES=$?
-if (($RES > 0)); then
-  exit $RES
-else
+nix-shell -A env --pure -j 8 -I ../deps --command "$BUILD_IT; exit $?"
+if [[ -e "$SNIPPET_DIR/Main.jsexe" ]]; then
+  echo success > "$SNIPPET_DIR/success"
   cat $SNIPPET_DIR/Main.jsexe/out.js $SNIPPET_DIR/Main.jsexe/runmain.js > $SNIPPET_DIR/out.js
   cp $SNIPPET_DIR/Main.jsexe/rts.js $SNIPPET_DIR
   cp $SNIPPET_DIR/Main.jsexe/lib.js $SNIPPET_DIR
@@ -37,6 +35,4 @@ else
   #rm -fr $SNIPPET_DIR/Main.jsexe $SNIPPET_DIR/dist
   cp template.html $SNIPPET_DIR/index.html
   echo "<script language='javascript' src='/$SNIPPET_DIR/out.js' defer></script></html>" >> $SNIPPET_DIR/index.html
-  echo success > "$SNIPPET_DIR/success"
-  exit 0
 fi
