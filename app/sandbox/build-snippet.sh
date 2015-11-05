@@ -18,14 +18,14 @@ $SNIPPET_DIR/Main.hs \
 -Wall \
 -fno-warn-unused-imports \
 -fno-warn-unused-do-bind \
--fno-warn-orphans"
+-fno-warn-orphans &> '$SNIPPET_DIR/build-out.txt'"
 
 if ! command -v nix-shell >/dev/null ; then
   echo Setting up environment
   . ~/.nix-profile/etc/profile.d/nix.sh
 fi
 
-nix-shell -A env --pure -j 8 -I ../deps --command "$BUILD_IT" &> "$SNIPPET_DIR/build-out.txt"
+nix-shell -A env --pure -j 8 -I ../deps --command "$BUILD_IT"
 RES=$?
 if (($RES > 0)); then
   exit $RES
