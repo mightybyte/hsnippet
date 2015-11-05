@@ -33,18 +33,23 @@ ghcjsBuildHandler = do
     case decode . toS =<< mbs of
       Just (String t) -> do
           let sb = mkSnippetBlob t
-          (out, err, success) <- liftIO $ do
-              exists <- doesFileExist $ sbJsOut sb
+          (out, success) <- liftIO $ do
+              exists <- doesDirectoryExist $ sbRoot sb
               putStrLn $ "Exists " ++ show exists ++ ": " ++ sbJsOut sb
               if exists
-                then return ("Snippet already built", "", True)
+                then do
+                  out <- readFile $ sbOutput sb
+                  success <- doesFileExist $ sbRoot sb </> "success"
+                  return (out, success)
                 else do
                   createDirectoryIfMissing True (sbRoot sb)
                   copyFile "sandbox/template.hs" (sbMain sb)
                   T.appendFile (sbMain sb) t
-                  (code, out, err) <- buildSnippet sb
-                  return (out, err, code == ExitSuccess)
-          writeJSON $ BuildResults (sbName sb) out err success
+                  (code, _, _) <- buildSnippet sb
+                  putStrLn $ "Got code " ++ show code
+                  out <- readFile $ sbOutput sb
+                  return (out, code == ExitSuccess)
+          writeJSON $ BuildResults (sbName sb) out success
       _ -> writeJSON $ String "<h2 class='red'>Error: no data</h2>"
 
 data SnippetBlob = SnippetBlob
@@ -54,6 +59,9 @@ data SnippetBlob = SnippetBlob
 
 mkSnippetBlob :: Text -> SnippetBlob
 mkSnippetBlob t = SnippetBlob t (sha1 $ toS t)
+
+sbOutput :: SnippetBlob -> String
+sbOutput sb = sbRoot sb </> "build-out.txt"
 
 sbName :: SnippetBlob -> String
 sbName SnippetBlob{..} = "Snippet_" ++ showDigest sbHash

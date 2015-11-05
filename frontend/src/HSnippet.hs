@@ -119,8 +119,7 @@ showTab AppTab = "App"
 setTabFromBuildStatus :: BuildStatus -> OutputTab
 setTabFromBuildStatus (Built br) =
     if brSuccess br
-      -- TODO Switch to AppTab when we have better failure detection
-      then ConsoleTab
+      then AppTab
       else ConsoleTab
 setTabFromBuildStatus _ = ConsoleTab
 
@@ -152,12 +151,10 @@ consoleOutput NotBuilt = do
     el "p" $ text "This is where the snippet's output will go."
 consoleOutput Building = loading
 consoleOutput BuildFailed = do
-    elClass "h2" "red text" $ text "Error"
-    elClass "p" "text" $ text "Build failed"
+    elClass "h2" "red text" $ text "Server Error"
+    elClass "p" "text" $ text "There was an unexpected problem"
 consoleOutput (Built br) = do
     el "pre" $ text $ brConsoleOut br
-    divClass "ui divider" blank
-    el "pre" $ text $ brConsoleErr br
 
 jsOutput :: MonadWidget t m => BuildStatus -> m ()
 jsOutput NotBuilt = do
