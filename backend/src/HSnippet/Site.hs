@@ -31,6 +31,7 @@ import           Snap.Snaplet.Heist
 import           Snap.Snaplet.PostgresqlSimple (getConnectionString)
 import           Snap.Snaplet.Session.Backends.CookieSession
 import           Snap.Util.FileServe
+import           System.IO
 ------------------------------------------------------------------------------
 import           HSnippet.BuildSnippet
 import           HSnippet.Reload
@@ -113,6 +114,9 @@ lookupFail def cfg key = do
 -- | The application initializer.
 app :: SnapletInit App App
 app = makeSnaplet "app" "An snaplet example application." Nothing $ do
+    liftIO $ do
+      hSetBuffering stdout NoBuffering
+      hSetBuffering stderr NoBuffering
     h <- nestSnaplet "" heist $ heistInit ""
     s <- nestSnaplet "sess" sess $
            initCookieSessionManager "site_key.txt" "sess" Nothing (Just 3600)
