@@ -96,6 +96,5 @@ getOutput sb = do
 buildSnippet :: SnippetBlob -> IO (ExitCode, String, String)
 buildSnippet sb = do
     putStrLn $ "Building " ++ sbName sb
-    let cp = (proc "./build-snippet.sh" [sbName sb])
-               { cwd = Just "sandbox" }
+    let cp = proc "./build-snippet.sh" [sbName sb]
     readCreateProcessWithExitCode cp ""

@@ -5,6 +5,7 @@ in nixpkgs.stdenv.mkDerivation (rec {
   snaplets = ./app/snaplets;
   static = ./app/static;
   sandbox = ./app/sandbox;
+  app = ./app;
 
   deps = ./deps;
   lib = ./hsnippet-lib;
@@ -22,6 +23,7 @@ in nixpkgs.stdenv.mkDerivation (rec {
 
     cp -r --no-preserve=mode "$static" "$out/static"
     cp -r --no-preserve=mode "$snaplets" "$out/snaplets"
+    ln -s "$app/build-snippet.sh" "$out"
     ln -s "$static" "$out/static"
     ln -s "$sandbox" "$out/sandbox-template"
     ln -s "$lib" "$out/hsnippet-lib"
