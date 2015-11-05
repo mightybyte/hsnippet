@@ -38,10 +38,7 @@ ghcjsBuildHandler = do
               putStrLn $ "Exists " ++ show exists ++ ": " ++ sbJsOut sb
               if exists
                 then do
-                  outExists <- doesFileExist $ sbOutput sb
-                  out <- if outExists
-                           then readFile $ sbOutput sb
-                           else return "No output"
+                  out <- getOutput sb
                   success <- doesFileExist $ sbRoot sb </> "success"
                   return (out, success)
                 else do
@@ -50,7 +47,7 @@ ghcjsBuildHandler = do
                   T.appendFile (sbMain sb) t
                   (code, _, _) <- buildSnippet sb
                   putStrLn $ "Got code " ++ show code
-                  out <- readFile $ sbOutput sb
+                  out <- getOutput sb
                   return (out, code == ExitSuccess)
           writeJSON $ BuildResults (sbName sb) out success
       _ -> writeJSON $ String "<h2 class='red'>Error: no data</h2>"
@@ -78,6 +75,13 @@ sbMain sb = sbRoot sb </> "Main.hs"
 -- NOTE: This must match the output file in sandbox/build-snippet.sh
 sbJsOut :: SnippetBlob -> String
 sbJsOut sb = sbRoot sb </> "out.js.gz"
+
+getOutput :: SnippetBlob -> IO String
+getOutput sb = do
+    outExists <- doesFileExist $ sbOutput sb
+    if outExists
+      then readFile $ sbOutput sb
+      else return "No output"
 
 buildSnippet :: SnippetBlob -> IO (ExitCode, String, String)
 buildSnippet sb = do
