@@ -1,4 +1,4 @@
-{ reflex-platform ? import ../deps/reflex-platform {} }:
+{ reflex-platform ? import ../deps/reflex-platform { nixpkgsFunc = import ../nixpkgs; } }:
 let nixpkgs = reflex-platform.nixpkgs;
 in import ./common.nix {
   haskellPackages = import ./packages.nix {

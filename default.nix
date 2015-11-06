@@ -14,6 +14,7 @@ in nixpkgs.stdenv.mkDerivation (rec {
   frontend = import ./frontend { inherit reflex-platform; };
   develCfgTemplate = ./app/devel.cfg.template;
   buildEnv = (import ./frontend/default.nix {}).env.nativeBuildInputs;
+  myNixPkgs = nixpkgs.path;
   builder = builtins.toFile "builder.sh" ''
     source "$stdenv/setup"
 
@@ -21,6 +22,7 @@ in nixpkgs.stdenv.mkDerivation (rec {
 
     mkdir -p "$out"
 
+    ln -s "$myNixPkgs" "$out/nixpkgs"
     cp -r --no-preserve=mode "$static" "$out/static"
     cp -r --no-preserve=mode "$snaplets" "$out/snaplets"
     ln -s "$app/build-snippet.sh" "$out"
