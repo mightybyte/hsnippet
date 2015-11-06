@@ -98,7 +98,8 @@ leftColumn = do
   where
     --example = "main = appMain $ text \"aoeu\""
     example = unlines
-      [ "main = appMain $ do"
+      [ "app :: MonadWidget t m => App t m ()"
+      , "app = do"
       , "  rec str <- holdDyn \"Click to edit me\" edits"
       , "      edits <- editInPlace (constant True) str"
       , "  return ()"
