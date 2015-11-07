@@ -20,11 +20,6 @@ $SNIPPET_DIR/Main.hs \
 -fno-warn-unused-do-bind \
 -fno-warn-orphans &> '$SNIPPET_DIR/build-out.txt'"
 
-if ! command -v nix-shell >/dev/null ; then
-  echo Setting up environment
-  . ~/.nix-profile/etc/profile.d/nix.sh
-fi
-
 nix-shell -A env --pure -j 8 -I ../deps --command "$BUILD_IT; exit $?"
 if [[ -e "$SNIPPET_DIR/Main.jsexe" ]]; then
   echo success > "$SNIPPET_DIR/success"
