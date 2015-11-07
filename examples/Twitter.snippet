@@ -1,7 +1,5 @@
-main = appMain twitter
-
-twitter :: MonadWidget t m => m ()
-twitter = do
+app :: MonadWidget t m => m ()
+app = do
   rec ta <- textArea $ def & setValue .~ ("" <$ click)
                            & attributes .~ (constDyn $ "maxlength" =: "140")
       click <- button "Send Tweet"

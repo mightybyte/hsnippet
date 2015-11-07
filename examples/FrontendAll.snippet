@@ -81,9 +81,10 @@ data BuildResults = BuildResults
     , brConsoleOut  :: String
     , brConsoleErr  :: String
     , brSuccess     :: Bool
-    } deriving (Eq,Show,Ord)
+    } deriving (Eq,Show,Ord,Generic)
 
-$(deriveJSON defaultOptions ''BuildResults)
+instance ToJSON BuildResults
+instance FromJSON BuildResults
 
 
 buildCode
@@ -97,8 +98,6 @@ buildCode code = do
 ------------------------------------------------------------------------------
 --                                 Main App
 ------------------------------------------------------------------------------
-
-main = appMain hsnippetApp
 
 data Menu t = Menu
     { runEvent :: Event t ()
@@ -115,8 +114,8 @@ data Output t = Output
     { buildStatus :: Dynamic t BuildStatus
     }
 
-hsnippetApp :: MonadWidget t m => App t m ()
-hsnippetApp = do
+app :: MonadWidget t m => App t m ()
+app = do
     rec mData <- menu out
         out <- elAttr "div" ("class" =: "ui two column padded grid" <>
                       "style" =: "height: calc(100% - 40px)") $ do

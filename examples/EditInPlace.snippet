@@ -1,4 +1,4 @@
-main = appMain $ do
+app = do
   rec str <- holdDyn "Click to edit me" edits
       edits <- editInPlace (constant True) str
   return ()

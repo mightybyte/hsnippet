@@ -23,6 +23,7 @@ executable hsnippet-frontend
     , data-default
     , dependent-map
     , dependent-sum
+    , diagrams-lib
     , errors
     , generic-deriving
     , ghcjs-dom
