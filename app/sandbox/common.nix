@@ -11,6 +11,7 @@ haskellPackages.mkDerivation {
     comonad
     data-default
     dependent-sum-template
+    diagrams-lib
     errors
     ghc
     ghcjs-dom
