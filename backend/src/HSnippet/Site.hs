@@ -10,7 +10,6 @@ module HSnippet.Site
 
 ------------------------------------------------------------------------------
 import           Control.Applicative
-import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.Trans
 import           Data.ByteString (ByteString)
@@ -26,13 +25,13 @@ import           Database.Groundhog.Postgresql
 import           Snap.Core
 import           Snap.Snaplet
 import           Snap.Snaplet.Auth
-import           Snap.Snaplet.Auth.Backends.JsonFile
 import           Snap.Snaplet.Heist
 import           Snap.Snaplet.PostgresqlSimple (getConnectionString)
 import           Snap.Snaplet.Session.Backends.CookieSession
 import           Snap.Util.FileServe
 import           System.IO
 ------------------------------------------------------------------------------
+import           GroundhogAuth
 import           HSnippet.BuildSnippet
 import           HSnippet.Reload
 import           HSnippet.Types.App
@@ -51,9 +50,7 @@ handleLogin authError = render "login"
 handleLoginSubmit :: Handler App (AuthManager App) ()
 handleLoginSubmit =
     loginUser "login" "password" Nothing
-              (\_ -> handleLogin err) (redirect "/")
-  where
-    err = Just "Unknown user or password"
+              (writeText . toS . show) (redirect "/")
 
 
 ------------------------------------------------------------------------------
@@ -69,9 +66,11 @@ handleNewUser = method GET handleForm <|> method POST handleFormSubmit
   where
     handleForm = render "new_user"
     handleFormSubmit = do
-        registerUser "login" "password"
-        loginUser "login" "password" Nothing
-                  (\_ -> handleLogin err) (redirect "/")
+        res <- registerUser "login" "password"
+        case res of
+          Left e -> writeText $ T.pack $ "Error creating user: " ++ show e
+          Right _ -> loginUser "login" "password" Nothing
+                               (\_ -> handleLogin err) (redirect "/")
     err = Just "Unknown user or password"
 
 ------------------------------------------------------------------------------
@@ -121,20 +120,17 @@ app = makeSnaplet "app" "An snaplet example application." Nothing $ do
     s <- nestSnaplet "sess" sess $
            initCookieSessionManager "site_key.txt" "sess" Nothing (Just 3600)
 
-    -- NOTE: We're using initJsonFileAuthManager here because it's easy and
-    -- doesn't require any kind of database server to run.  In practice,
-    -- you'll probably want to change this to a more robust auth backend.
-    a <- nestSnaplet "auth" auth $
-           initJsonFileAuthManager defAuthSettings sess "users.json"
-    addRoutes routes
-    addAuthSplices h auth
-
-
     conf <- getSnapletUserConfig
     let cfg = subconfig "postgres" conf
     connstr <- liftIO $ getConnectionString cfg
     ghPool <- liftIO $ withPostgresqlPool (toS connstr) 3 return
     liftIO $ runNoLoggingT (withConn (runDbPersist migrateDB) ghPool)
+
+    --a <- nestSnaplet "auth" auth $
+    --       initJsonFileAuthManager defAuthSettings sess "users.json"
+    a <- nestSnaplet "auth" auth $ initGroundhogAuth sess ghPool
+    addRoutes routes
+    addAuthSplices h auth
 
     -- See if we need to enable heist autoreloading
     -- Commented out because for some reason it's not working
