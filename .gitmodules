@@ -19,3 +19,6 @@
 [submodule "deps/snap-loader-dynamic"]
 	path = deps/snap-loader-dynamic
 	url = https://github.com/snapframework/snap-loader-dynamic.git
+[submodule "deps/diagrams-reflex"]
+	path = deps/diagrams-reflex
+	url = https://github.com/diagrams/diagrams-reflex.git

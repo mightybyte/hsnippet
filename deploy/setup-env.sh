@@ -4,7 +4,8 @@
 # output of nix-build.
 
 mkdir log
-mkdir -p sandbox/snippets
-cp --no-preserve=mode sandbox-template/* sandbox
+mkdir -p userbuild/snippets
+cp -R --no-preserve=mode userbuild-template/* userbuild
+chmod +x userbuild/run-build.sh
 
 cp --no-preserve=mode devel.cfg.template devel.cfg

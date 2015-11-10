@@ -18,6 +18,7 @@ haskellPackages.mkDerivation {
     diagrams-lib
     ghc
     ghcjs-dom
+    hsnippet-lib
     http-types
     lens
     monad-loops

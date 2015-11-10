@@ -50,13 +50,17 @@ waitUntilJust a = do
 
 
 ------------------------------------------------------------------------------
---appMain :: MonadWidget t m => String -> App t m () -> IO ()
-appMain app = runWebGUI $ \webView -> do
+getRoot :: HTMLDocument -> String -> IO HTMLElement
+getRoot doc appRootId = waitUntilJust $ liftM (fmap castToHTMLElement) $
+                documentGetElementById doc appRootId
+
+
+------------------------------------------------------------------------------
+-- appMain :: String -> (forall t m. MonadWidget t m => App t m ()) -> IO ()
+appMain appRootId app = runWebGUI $ \webView -> do
     doc <- waitUntilJust $ liftM (fmap castToHTMLDocument) $
       webViewGetDomDocument webView
-    let btag = "snippet-output"
-    root <- waitUntilJust $ liftM (fmap castToHTMLElement) $
-      documentGetElementById doc btag
+    root <- getRoot doc appRootId
     body <- waitUntilJust $ documentGetBody doc
     attachWidget root webView $ do
       let eventTargetAbsorbsKeys = do

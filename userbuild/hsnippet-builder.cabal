@@ -7,8 +7,8 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 executable hsnippet-frontend
-  hs-source-dirs: src, src-shared
-  main-is: Main.hs
+  hs-source-dirs: src
+  main-is: DummyMain.hs
 
   build-depends:
       aeson
@@ -17,12 +17,14 @@ executable hsnippet-frontend
     , bifunctors
     , bytestring
     , cereal
+    , colour
     , comonad
     , containers
     , data-default
     , dependent-map
     , dependent-sum
     , diagrams-lib
+    , diagrams-reflex
     , errors
     , generic-deriving
     , ghcjs-dom
@@ -32,6 +34,7 @@ executable hsnippet-frontend
     , lens
     , monad-loops
     , mtl
+    , palette
     , readable
     , reflex
     , reflex-dom

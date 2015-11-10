@@ -21,6 +21,7 @@ import           Data.Aeson.TH
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Monoid
+import           Diagrams.Backend.Reflex
 import qualified Diagrams.Prelude as D
 import           GHC.Generics
 import           Reflex
@@ -37,5 +38,5 @@ import           HSnippet.Lib
 
 
 main :: IO ()
-main = appMain app
-------------------------------------------------------------------------------
+main = return ()
+

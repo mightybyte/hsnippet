@@ -3,15 +3,17 @@ haskellPackages.mkDerivation {
   pname = "hsnippet-builder";
   version = "0.1";
   src = ./.;
-  isExecutable = true;
+  isExecutable = false;
   isLibrary = false;
   buildDepends = with haskellPackages; [
     aeson
     cereal
+    colour
     comonad
     data-default
     dependent-sum-template
     diagrams-lib
+    diagrams-reflex
     errors
     ghc
     ghcjs-dom
@@ -19,6 +21,7 @@ haskellPackages.mkDerivation {
     http-types
     lens
     monad-loops
+    palette
     readable
     reflex
     reflex-dom

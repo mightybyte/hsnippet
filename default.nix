@@ -4,16 +4,16 @@ in nixpkgs.stdenv.mkDerivation (rec {
   name = "hsnippet";
   snaplets = ./app/snaplets;
   static = ./app/static;
-  sandbox = ./app/sandbox;
   app = ./app;
 
   deps = ./deps;
   lib = ./hsnippet-lib;
   deploy = ./deploy;
+  userbuild = ./userbuild;
   backend = import ./backend { nixpkgs = reflex-platform.nixpkgs; };
   frontend = import ./frontend { inherit reflex-platform; };
   develCfgTemplate = ./app/devel.cfg.template;
-  buildEnv = (import ./frontend/default.nix {}).env.nativeBuildInputs;
+  buildEnv = (import ./userbuild/default.nix {}).env.nativeBuildInputs;
   myNixPkgs = nixpkgs.path;
   builder = builtins.toFile "builder.sh" ''
     source "$stdenv/setup"
@@ -25,11 +25,11 @@ in nixpkgs.stdenv.mkDerivation (rec {
     ln -s "$myNixPkgs" "$out/nixpkgs"
     cp -r --no-preserve=mode "$static" "$out/static"
     cp -r --no-preserve=mode "$snaplets" "$out/snaplets"
-    ln -s "$app/build-snippet.sh" "$out"
     ln -s "$static" "$out/static"
-    ln -s "$sandbox" "$out/sandbox-template"
+    ln -s "$userbuild" "$out/userbuild-template"
     ln -s "$lib" "$out/hsnippet-lib"
     mkdir -p "$out/deps"
+    ln -s "$deps/diagrams-reflex" "$out/deps/diagrams-reflex"
     ln -s "$deps/reflex-dom-contrib" "$out/deps/reflex-dom-contrib"
     ln -s "$deps/reflex-platform" "$out/deps/reflex-platform"
     echo "$buildEnv" >"$out/buildEnv"
@@ -48,6 +48,7 @@ in nixpkgs.stdenv.mkDerivation (rec {
 
     mkdir "$out/bin"
     ln -s "$backend/bin/main" "$out/bin"
+    ln -s "$backend/bin/build-snippet" "$out/bin"
     ln -s "$deploy/setup-env.sh" "$out/bin/setup-env.sh"
 
     ln -s "$develCfgTemplate" "$out/devel.cfg.template"
