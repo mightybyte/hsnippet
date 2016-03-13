@@ -21,4 +21,4 @@
 	url = https://github.com/snapframework/snap-loader-dynamic.git
 [submodule "deps/diagrams-reflex"]
 	path = deps/diagrams-reflex
-	url = https://github.com/diagrams/diagrams-reflex.git
+	url = https://github.com/mightybyte/diagrams-reflex.git
