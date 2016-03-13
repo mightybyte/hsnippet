@@ -59,6 +59,12 @@ hasBuildEnvironment = do
     myGuard True = return ()
     myGuard False = MaybeT $ return Nothing
 
+getBuildEnvPackages :: IO String
+getBuildEnvPackages = do
+    let cp = (shell $ nixShellCmd "ghcjs-pkg list") { cwd = Just buildRoot }
+    (_, o, _) <- readCreateProcessWithExitCode cp ""
+    return o
+
 buildSnippet :: Text -> IO (String, Bool)
 buildSnippet snippet = do
     res <- runMaybeT $ do
@@ -68,7 +74,7 @@ buildSnippet snippet = do
           createDirectoryIfMissing True (sbRoot sb)
           copyFile (buildRoot </> "template.hs") (sbRoot sb </> "Main.hs")
           T.appendFile (sbRoot sb </> "Main.hs") suffix
-          let cp = (shell cmd) { cwd = Just buildRoot }
+          let cp = (shell $ nixShellCmd $ ghcjsBuildCmd sb outDir) { cwd = Just buildRoot }
           (_, o, e) <- readCreateProcessWithExitCode cp ""
           writeFile (sbRoot sb </> "run-stdout.txt") o
           writeFile (sbRoot sb </> "run-stderr.txt") e
@@ -85,39 +91,44 @@ buildSnippet snippet = do
     sb = mkSnippetBlob snippet
     file = sbName sb <.> "snippet"
     outDir = sbInnerRoot sb </> "dist"
-    cmd = unwords $ "nix-shell" : nixArgs
-    nixArgs = [ "-A", "env"
-              , "--pure"
-              , "-j", "8"
-              , "-I", "../deps"
-              , "--command"
-              , "\"" ++ unwords ghcjsCmd ++ "; exit $?\""
-              ]
-    ghcjsCmd = [ "ghcjs"
-               , "--make"
-               , "-j4"
-               , "-static"
-               , "-outputdir", outDir
-               , "-odir", outDir
-               , "-hidir", outDir
-               , "-stubdir", outDir
-               , "-isnippets"
-               , "-I" ++ sbInnerRoot sb
-               , "-XHaskell2010"
-               , sbInnerRoot sb </> "Main.hs"
-               , "-O2"
-               , "-Wall"
-               , "-fno-warn-unused-imports"
-               , "-fno-warn-unused-do-bind"
-               , "-fno-warn-orphans"
---               , "&>"
---               , sbOutput sb
-               ]
     suffix = T.unlines
       [ snippet
       , "main :: IO ()"
       , "main = appMain \"snippet-output\" app"
       ]
+
+nixShellCmd cmd =
+    unwords $ "nix-shell" : nixArgs
+  where
+    nixArgs = [ "-A", "env"
+              , "--pure"
+              , "-j", "8"
+              , "-I", "../deps"
+              , "--command"
+              , "\"" ++ cmd ++ "; exit $?\""
+              ]
+
+ghcjsBuildCmd sb outDir = unwords
+    [ "ghcjs"
+    , "--make"
+    , "-j4"
+    , "-static"
+    , "-outputdir", outDir
+    , "-odir", outDir
+    , "-hidir", outDir
+    , "-stubdir", outDir
+    , "-isnippets"
+    , "-I" ++ sbInnerRoot sb
+    , "-XHaskell2010"
+    , sbInnerRoot sb </> "Main.hs"
+    , "-O2"
+    , "-Wall"
+    , "-fno-warn-unused-imports"
+    , "-fno-warn-unused-do-bind"
+    , "-fno-warn-orphans"
+--    , "&>"
+--    , sbOutput sb
+    ]
 
 setupResults :: SnippetBlob -> IO ()
 setupResults sb = do

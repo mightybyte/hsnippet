@@ -33,6 +33,7 @@ import           System.IO
 ------------------------------------------------------------------------------
 import           GroundhogAuth
 import           HSnippet.BuildSnippet
+import           HSnippet.BuildTypes
 import           HSnippet.Reload
 import           HSnippet.Types.App
 import           HSnippet.Shared.Types.Snippet
@@ -82,6 +83,7 @@ routes = [ ("login",       with auth handleLoginSubmit)
          , ("heistReload", failIfNotLocal $ with heist heistReloader)
          , ("run",         ghcjsBuildHandler)
          , ("snippets",    serveDirectory "userbuild/snippets")
+         , ("packages",    writeText . T.pack =<< liftIO getBuildEnvPackages)
          , ("",            serveDirectory "static")
          ]
 

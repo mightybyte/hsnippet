@@ -22,6 +22,9 @@ import           Data.Aeson.TH
 import           Data.Colour.Palette.BrewerSet
 import           Data.Map (Map)
 import qualified Data.Map as M
+import           Data.String.Conv
+import           Data.Text (Text)
+import qualified Data.Text as T
 import           Data.Monoid
 import           Diagrams.Backend.Reflex
 import qualified Diagrams.Prelude as D

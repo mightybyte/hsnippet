@@ -18,13 +18,14 @@ import           Control.Monad.Trans
 import           Control.Monad.Trans.Reader
 import           Data.Char
 import           GHCJS.DOM
-import           GHCJS.DOM.Document
+import           GHCJS.DOM.Document (getElementById, getBody)
 import           GHCJS.DOM.Element
-import           GHCJS.DOM.EventM (preventDefault, eventTarget)
+import           GHCJS.DOM.EventM (preventDefault, eventTarget, on)
 import           GHCJS.DOM.HTMLDocument
 import           GHCJS.DOM.HTMLElement
 import           Reflex.Dom hiding (getKeyEvent)
 import           Reflex.Dom.Contrib.KeyEvent
+import           Reflex.Dom.Contrib.Utils
 ------------------------------------------------------------------------------
 
 
@@ -39,20 +40,9 @@ data AppState t = AppState
 
 
 ------------------------------------------------------------------------------
-waitUntilJust :: IO (Maybe a) -> IO a
-waitUntilJust a = do
-    mx <- a
-    case mx of
-      Just x -> return x
-      Nothing -> do
-        threadDelay 10000
-        waitUntilJust a
-
-
-------------------------------------------------------------------------------
 getRoot :: HTMLDocument -> String -> IO HTMLElement
 getRoot doc appRootId = waitUntilJust $ liftM (fmap castToHTMLElement) $
-                documentGetElementById doc appRootId
+                getElementById doc appRootId
 
 
 ------------------------------------------------------------------------------
@@ -61,13 +51,13 @@ appMain appRootId app = runWebGUI $ \webView -> do
     doc <- waitUntilJust $ liftM (fmap castToHTMLDocument) $
       webViewGetDomDocument webView
     root <- getRoot doc appRootId
-    body <- waitUntilJust $ documentGetBody doc
+    body <- waitUntilJust $ getBody doc
     attachWidget root webView $ do
       let eventTargetAbsorbsKeys = do
             Just t <- liftM (fmap castToHTMLElement) eventTarget
-            n <- liftIO $ elementGetTagName t
-            return $ n `elem` ["INPUT", "SELECT", "TEXTAREA"]
-      liftIO $ elementOnkeydown body $ do
+            n <- liftIO $ getTagName t
+            return $ n `elem` [Just "INPUT", Just "SELECT", Just "TEXTAREA"]
+      liftIO $ (`on` keyDown) body $ do
         ke <- getKeyEvent
         absorbs <- eventTargetAbsorbsKeys
         when (ke == (key $ chr 8) && not absorbs) preventDefault
@@ -77,6 +67,6 @@ appMain appRootId app = runWebGUI $ \webView -> do
             return $ if absorbs && ke /= (key $ chr 27) -- Let the escape through
                      then Nothing
                      else Just ke
-      keyDown <- wrapKeypress elementOnkeydown
-      keyPress <- wrapKeypress elementOnkeypress
-      runReaderT app $ AppState keyDown keyPress
+      kd <- wrapKeypress (`on` keyDown)
+      kp <- wrapKeypress (`on` keyPress)
+      runReaderT app $ AppState kd kp

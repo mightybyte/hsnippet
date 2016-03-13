@@ -22,10 +22,10 @@ in (nixpkgs.pkgs.haskell.packages.${compiler}.override {
     blaze-builder = dontCheck (overrideCabal super.blaze-builder (drv: { version = "0.4.0.1"; sha256 = "1id3w33x9f7q5m3xpggmvzw03bkp94bpfyz81625bldqgf3yqdn1"; }));
     blaze-markup = dontCheck (overrideCabal super.blaze-markup (drv: { version = "0.7.0.3"; sha256 = "080vlhd8dwjxrma4bb524lh8gxs5lm3xh122icy6lnnyipla0s9y"; }));
     blaze-html = dontCheck (overrideCabal super.blaze-html (drv: { version = "0.8.1.1"; sha256 = "1dnw50kh0s405cg9i2y4a8awanhj3bqzk21jwgfza65kcjby7lpq"; }));
+    clock = dontCheck (overrideCabal super.clock (drv: { version = "0.5.1"; sha256 = "1ncph7vi2q6ywwc8ysxl1ibw6i5dwfvln88ssfazk8jgpj4iyykw"; }));
     contravariant = addBuildDepend super.contravariant self.tagged;
     cookie = dontCheck super.cookie;
     crypto-pubkey = dontCheck super.crypto-pubkey;
-    errors = dontCheck (overrideCabal super.errors (drv: { version = "2.0.1"; sha256 = "1w4pr6hbd731in6rcpxyn06h1zkjd1fnvzr5k2rn9zgsm7j8amby"; }));
     fsnotify = addBuildDepend (dontCheck (overrideCabal super.fsnotify (drv: { version = "0.2.1"; sha256 = "0asl313a52qx2w6dw25g845683xsl840bwjh118nkwi5v1xipkzb"; }))) self.unix-compat;
     #ghc-prim = dontCheck super.ghc-prim;
     hashable = dontCheck super.hashable;

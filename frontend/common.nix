@@ -16,7 +16,6 @@ haskellPackages.mkDerivation {
     dependent-sum-template
     errors
     diagrams-lib
-    ghc
     ghcjs-dom
     hsnippet-lib
     http-types
