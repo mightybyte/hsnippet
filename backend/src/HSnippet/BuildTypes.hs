@@ -43,7 +43,6 @@ sbOutput sb = sbRoot sb </> "run-stdout.txt"
 sbSnippetFile :: SnippetBlob -> String
 sbSnippetFile sb = buildRoot </> sbName sb <.> "snippet"
 
--- NOTE: This must match the output file in userbuild/run-build.sh
 sbJsOut :: SnippetBlob -> String
 sbJsOut sb = sbRoot sb </> "out.js.gz"
 
@@ -61,7 +60,9 @@ hasBuildEnvironment = do
 
 getBuildEnvPackages :: IO String
 getBuildEnvPackages = do
-    let cp = (shell $ nixShellCmd "ghcjs-pkg list") { cwd = Just buildRoot }
+    let cmd = nixShellCmd "ghcjs-pkg list"
+    putStrLn "Getting packages in the snippet build environment"
+    let cp = (shell cmd) { cwd = Just buildRoot }
     (_, o, _) <- readCreateProcessWithExitCode cp ""
     return o
 
