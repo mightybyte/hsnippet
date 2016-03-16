@@ -14,8 +14,6 @@ module HSnippet where
 ------------------------------------------------------------------------------
 import           Control.Lens
 import           Control.Monad
-import           Control.Monad.Trans
-import           Data.Aeson
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Monoid
@@ -28,7 +26,6 @@ import           HSnippet.DBLayer
 import           HSnippet.Lib
 import           HSnippet.Tabs
 import           HSnippet.Shared.Types.BuildResults
-import           HSnippet.Shared.WsApi
 import           HSnippet.XmlHttpRequest
 ------------------------------------------------------------------------------
 

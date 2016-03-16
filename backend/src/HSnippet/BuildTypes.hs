@@ -13,8 +13,6 @@ import           Data.String.Conv
 import qualified Data.Text            as T
 import qualified Data.Text.IO         as T
 import           Data.Text            (Text)
-import qualified Data.Text            as T
-import           Data.Text.Encoding
 import           System.Directory
 import           System.FilePath
 import           System.Process
