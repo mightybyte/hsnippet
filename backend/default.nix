@@ -55,6 +55,7 @@ in (nixpkgs.pkgs.haskell.packages.${compiler}.override {
     xmlhtml = dontCheck (self.callPackage (cabal2nix ../deps/snap/deps/xmlhtml) {});
     snap = dontCheck (self.callPackage (cabal2nix ../deps/snap) {});
     snaplet-postgresql-simple = self.callPackage (cabal2nix ../deps/snaplet-postgresql-simple) {};
-    websockets-snap = self.callPackage (cabal2nix ../deps/websockets-snap) {};
+    websockets = dontCheck (self.callPackage (cabal2nix ../deps/websockets) {});
+    websockets-snap = dontCheck (self.callPackage (cabal2nix ../deps/websockets-snap) {});
   };
 }).callPackage ./packages.nix { }

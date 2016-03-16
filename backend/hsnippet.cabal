@@ -46,9 +46,9 @@ executable main
     string-conv,
     text,
     time                      >= 1.4  && < 1.6,
-    transformers
-    -- websockets,
-    -- websockets-snap >= 1.0.0.0 && < 1.1
+    transformers,
+    websockets,
+    websockets-snap           >= 1.0.0.0 && < 1.1
   if impl(ghc >= 7.8)
     build-depends: base >= 4.7 && < 5
   else
@@ -60,22 +60,23 @@ executable build-snippet
   hs-source-dirs: src src-shared
   main-is: Builder.hs
   build-depends:
-    SHA                       >= 1.6  && < 1.7,
+    SHA,
+    aeson,
     bytestring,
     containers,
-    directory                 >= 1.2  && < 1.3,
-    errors                    >= 2.0  && < 2.2,
-    filepath                  >= 1.3  && < 1.5,
-    monad-logger              >= 0.3  && < 0.4,
+    directory,
+    errors,
+    filepath,
+    monad-logger,
     mtl,
-    process                   >= 1.2.3.0 && < 1.4,
+    process,
     random,
     readable,
-    resource-pool             >= 0.2  && < 0.3,
+    resource-pool,
     rng-utils,
     string-conv,
     text,
-    time                      >= 1.4  && < 1.6,
+    time,
     transformers
   if impl(ghc >= 7.8)
     build-depends: base >= 4.7 && < 5

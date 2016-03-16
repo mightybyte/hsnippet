@@ -10,8 +10,11 @@ module HSnippet.Site
 
 ------------------------------------------------------------------------------
 import           Control.Applicative
+import           Control.Monad
 import           Control.Monad.Logger
+import           Control.Monad.Reader
 import           Control.Monad.Trans
+import           Data.Aeson
 import           Data.ByteString (ByteString)
 import           Data.Configurator
 import           Data.Configurator.Types
@@ -22,6 +25,8 @@ import qualified Data.Text as T
 import           Database.Groundhog
 import           Database.Groundhog.Core
 import           Database.Groundhog.Postgresql
+import           Network.WebSockets
+import           Network.WebSockets.Snap
 import           Snap.Core
 import           Snap.Snaplet
 import           Snap.Snaplet.Auth
@@ -36,7 +41,9 @@ import           HSnippet.BuildSnippet
 import           HSnippet.BuildTypes
 import           HSnippet.Reload
 import           HSnippet.Types.App
+import           HSnippet.Shared.Types.Package
 import           HSnippet.Shared.Types.Snippet
+import           HSnippet.Shared.WsApi
 ------------------------------------------------------------------------------
 
 
@@ -83,9 +90,28 @@ routes = [ ("login",       with auth handleLoginSubmit)
          , ("heistReload", failIfNotLocal $ with heist heistReloader)
          , ("run",         ghcjsBuildHandler)
          , ("snippets",    serveDirectory "userbuild/snippets")
-         , ("packages",    writeText . T.pack =<< liftIO getBuildEnvPackages)
+         , ("packages",    packagesHandler)
+         , ("ws",          handleApi)
          , ("",            serveDirectory "static")
          ]
+
+
+packagesHandler = do
+    ps <- asks (_snippetPackages . _appState)
+    writeText $ T.unlines $ map packageName ps
+
+handleApi :: Handler App App ()
+handleApi = do
+  ps <- asks (_snippetPackages . _appState)
+  runWebSocketsSnap $ \pendingConn -> do
+    conn <- acceptRequest pendingConn
+    forever $ do
+      Text upRaw <- receiveDataMessage conn
+      Right up <- return $ eitherDecode' upRaw
+      case up of
+        Up_GetPackages -> do
+          sendTextData conn $ encode $ Down_Packages ps
+      return ()
 
 
 migrateDB :: (MonadIO m, PersistBackend m) => m ()
@@ -111,6 +137,15 @@ lookupFail def cfg key = do
           "! (usually defaults to \"" <> def <> "\")"
 
 
+buildAppState conf = do
+    let cfg = subconfig "postgres" conf
+    connstr <- liftIO $ getConnectionString cfg
+    ghPool <- liftIO $ withPostgresqlPool (toS connstr) 3 return
+
+    ps <- getBuildEnvPackages
+
+    return $ AppState ghPool ps
+
 ------------------------------------------------------------------------------
 -- | The application initializer.
 app :: SnapletInit App App
@@ -123,14 +158,12 @@ app = makeSnaplet "app" "An snaplet example application." Nothing $ do
            initCookieSessionManager "site_key.txt" "sess" Nothing (Just 3600)
 
     conf <- getSnapletUserConfig
-    let cfg = subconfig "postgres" conf
-    connstr <- liftIO $ getConnectionString cfg
-    ghPool <- liftIO $ withPostgresqlPool (toS connstr) 3 return
-    liftIO $ runNoLoggingT (withConn (runDbPersist migrateDB) ghPool)
+    appState <- liftIO $ buildAppState conf
+    liftIO $ runNoLoggingT (withConn (runDbPersist migrateDB) (_db appState))
 
     --a <- nestSnaplet "auth" auth $
     --       initJsonFileAuthManager defAuthSettings sess "users.json"
-    a <- nestSnaplet "auth" auth $ initGroundhogAuth sess ghPool
+    a <- nestSnaplet "auth" auth $ initGroundhogAuth sess (_db appState)
     addRoutes routes
     addAuthSplices h auth
 
@@ -139,5 +172,5 @@ app = makeSnaplet "app" "An snaplet example application." Nothing $ do
     --ar <- liftIO $ lookupFail "true" conf "autoreload-templates"
     --when ar $ liftIO $ autoReloadHeist "/heistReload" ["snaplets/heist"]
 
-    return $ App h s a ghPool
+    return $ App h s a appState
 

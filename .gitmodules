@@ -22,3 +22,6 @@
 [submodule "deps/diagrams-reflex"]
 	path = deps/diagrams-reflex
 	url = https://github.com/mightybyte/diagrams-reflex.git
+[submodule "deps/websockets"]
+	path = deps/websockets
+	url = https://github.com/jaspervdj/websockets.git

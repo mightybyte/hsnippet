@@ -16,6 +16,8 @@ import           System.Directory
 import           System.FilePath
 import           System.Process
 ------------------------------------------------------------------------------
+import           HSnippet.Shared.Types.Package
+------------------------------------------------------------------------------
 
 data SnippetBlob = SnippetBlob
     { sbContents :: Text
@@ -58,13 +60,13 @@ hasBuildEnvironment = do
     myGuard True = return ()
     myGuard False = MaybeT $ return Nothing
 
-getBuildEnvPackages :: IO String
+getBuildEnvPackages :: IO [Package]
 getBuildEnvPackages = do
     let cmd = nixShellCmd "ghcjs-pkg list"
     putStrLn "Getting packages in the snippet build environment"
     let cp = (shell cmd) { cwd = Just buildRoot }
     (_, o, _) <- readCreateProcessWithExitCode cp ""
-    return o
+    return $ map (Package . T.pack) $ tail $ lines o
 
 buildSnippet :: Text -> IO (String, Bool)
 buildSnippet snippet = do
