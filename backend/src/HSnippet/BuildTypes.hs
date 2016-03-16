@@ -67,7 +67,7 @@ getBuildEnvPackages = do
     putStrLn "Getting packages in the snippet build environment"
     let cp = (shell cmd) { cwd = Just buildRoot }
     (_, o, _) <- readCreateProcessWithExitCode cp ""
-    return $ map (Package . T.pack) $ tail $ lines o
+    return $ map (mkPackage . T.pack) $ filter (not . null) $ tail $ lines o
 
 buildSnippet :: Text -> IO (String, Bool)
 buildSnippet snippet = do

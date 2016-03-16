@@ -17,6 +17,7 @@ import           Control.Monad
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Monoid
+import           Data.String.Conv
 import           Reflex
 import           Reflex.Dom
 import           Reflex.Dom.Contrib.Utils
@@ -26,6 +27,7 @@ import           HSnippet.DBLayer
 import           HSnippet.Lib
 import           HSnippet.Tabs
 import           HSnippet.Shared.Types.BuildResults
+import           HSnippet.Shared.Types.Package
 import           HSnippet.XmlHttpRequest
 ------------------------------------------------------------------------------
 
@@ -60,13 +62,13 @@ appController mData inData = do
 
 runApp :: MonadWidget t m => App t m ()
 runApp = do
-    startDbLayer never
+    db <- startDbLayer never
     rec mData <- menu out
         out <- elAttr "div" ("class" =: "ui two column padded grid" <>
                       "style" =: "height: calc(100% - 40px)") $ do
           inData <- leftColumn
           outData <- appController mData inData
-          rightColumn outData
+          rightColumn db outData
           return outData
     return ()
 
@@ -108,17 +110,18 @@ leftColumn = do
       , "  return ()"
       ]
 
-rightColumn :: MonadWidget t m => Output t -> m ()
-rightColumn out = do
-    divClass "right column full-height" $ rightTabs out
+rightColumn :: MonadWidget t m => DBLayer t -> Output t -> m ()
+rightColumn db out = do
+    divClass "right column full-height" $ rightTabs db out
     return ()
 
-data OutputTab = ConsoleTab | AppTab
+data OutputTab = ConsoleTab | AppTab | InfoTab
   deriving (Eq,Show,Ord,Enum)
 
 showTab :: OutputTab -> String
 showTab ConsoleTab = "Console"
 showTab AppTab = "App"
+showTab InfoTab = "Info"
 
 setTabFromBuildStatus :: BuildStatus -> OutputTab
 setTabFromBuildStatus (Built br) =
@@ -134,10 +137,10 @@ instance MonadWidget t m => Tab t m OutputTab where
       (e,_) <- elDynAttr' "a" attrs (text $ showTab t)
       return $ domEvent Click e
 
-rightTabs :: MonadWidget t m => Output t -> m ()
-rightTabs Output{..} = do
+rightTabs :: MonadWidget t m => DBLayer t -> Output t -> m ()
+rightTabs db Output{..} = do
     curTab <- divClass "ui top attached menu" $ do
-      tabBar ConsoleTab [ConsoleTab, AppTab] never
+      tabBar ConsoleTab [ConsoleTab, AppTab, InfoTab] never
              (setTabFromBuildStatus <$> updated buildStatus)
     tabPane tabAttrs curTab ConsoleTab $ do
       divClass "grey segment full-height console-out" $ do
@@ -145,6 +148,9 @@ rightTabs Output{..} = do
     tabPane tabAttrs curTab AppTab $ do
       divClass "segment full-height" $ do
         widgetHoldHelper jsOutput NotBuilt $ updated buildStatus
+    tabPane tabAttrs curTab InfoTab $ do
+      divClass "segment full-height" $ do
+        infoTab db
     return ()
   where
     tabAttrs = "class" =: "ui bottom attached segment" <>
@@ -170,6 +176,39 @@ jsOutput BuildFailed = do
 jsOutput (Built br) = do
     let file = "/snippets/"++brSnippetHash br++"/index.html"
     elAttr "iframe" ("src" =: file) blank
+
+infoTab
+    :: MonadWidget t m
+    => DBLayer t
+    -> m ()
+infoTab db = do
+    packageMap <- mapDyn (M.fromList . zip [0..]) $ dbPackages db
+    elClass "table" "ui striped table" $ do
+      el "tr" $ do
+        el "th" $ text "Package"
+        el "th" $ text "Version"
+        el "th" $ text "Docs"
+        el "th" $ text "Modules"
+      listWithKey packageMap packageInfoWidget
+      return ()
+
+packageInfoWidget
+    :: MonadWidget t m
+    => Int
+    -> Dynamic t Package
+    -> m ()
+packageInfoWidget _ package = do
+    name <- mapDyn (toS . packageName) package
+    version <- mapDyn (toS . packageVersion) package
+    haddockAttrs <- mapDyn mkHaddock package
+    el "tr" $ do
+      el "td" $ dynText name
+      el "td" $ dynText version
+      el "td" $ elDynAttr "a" haddockAttrs $ text "docs"
+      el "td" $ text "modules (not implemented yet)"
+  where
+    mkHaddock Package{..} = "href" =:
+      (toS $ "http://hackage.haskell.org/package/" <> packageName <> "-" <> packageVersion)
 
 icon
     :: MonadWidget t m

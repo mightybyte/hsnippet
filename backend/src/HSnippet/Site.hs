@@ -103,13 +103,23 @@ handleApi = do
   runWebSocketsSnap $ \pendingConn -> do
     conn <- acceptRequest pendingConn
     forever $ do
-      Text upRaw <- receiveDataMessage conn
-      Right up <- return $ eitherDecode' upRaw
+      upRaw <- receiveDataMessage conn
+      up <- return $ eitherDecode' $ dataToBs upRaw
       case up of
-        Up_GetPackages -> do
-          sendTextData conn $ encode $ Down_Packages ps
+        Left e -> do
+          liftIO $ putStrLn $ "Websocket parse error: " ++ e
+          liftIO $ putStrLn $ "On message: " ++ show (dataToBs upRaw)
+        Right Up_GetPackages -> do
+          liftIO $ putStrLn "Got Up_GetPackages"
+          let d = encode $ Down_Packages ps
+          sendTextData conn d
+        _ -> liftIO $ putStrLn "No handler for this message"
       return ()
 
+
+--dataToBs :: DataMessage -> ByteString
+dataToBs (Text bs) = bs
+dataToBs (Binary bs) = bs
 
 migrateDB :: (MonadIO m, PersistBackend m) => m ()
 migrateDB = do

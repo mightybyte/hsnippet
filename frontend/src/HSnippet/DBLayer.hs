@@ -19,6 +19,7 @@ import qualified Data.ByteString.Lazy as LBS
 import           Data.Monoid
 import           Reflex
 import           Reflex.Dom
+import           Reflex.Dom.Contrib.Utils
 ------------------------------------------------------------------------------
 import           HSnippet.Shared.Types.Package
 import           HSnippet.Shared.WsApi
@@ -33,13 +34,12 @@ startDbLayer
     => Event t [Up]
     -> m (DBLayer t)
 startDbLayer upEvents = do
-    pb <- getPostBuild
     rec (downEvents, startEvent) <- openWebSocket $ mergeWith (++)
-          [ [Up_GetPackages] <$ pb
+          [ [Up_GetPackages] <$ traceEvent "websocket opened" startEvent
           , upEvents
           ]
     packages <- holdDyn [] $ fmapMaybe foo downEvents
-    return $ DBLayer packages
+    return $ DBLayer $ traceDyn "packages" packages
 
 foo :: Maybe Down -> Maybe [Package]
 foo md = (^? _Down_Packages) =<< md
@@ -47,6 +47,7 @@ foo md = (^? _Down_Packages) =<< md
 gateDyn :: Reflex t => Dynamic t Bool -> Event t a -> Event t a
 gateDyn d e = attachDynWithMaybe (\b a -> if b then Just a else Nothing) d e
 
+------------------------------------------------------------------------------
 openWebSocket
     :: MonadWidget t m
     => Event t [Up]
@@ -69,10 +70,12 @@ openWebSocket wsUp = do
           _ -> host
     rec ws <- webSocket (wsProtocol <> "//" <> wsHost <> "/ws") $
           def & webSocketConfig_send .~ send
-        websocketReady <- holdDyn False $ fmap (const True) $ _webSocket_open ws
+        websocketReady <- holdDyn False $ True <$ _webSocket_open ws
         websocketNotReady <- mapDyn not websocketReady
         buffer <- foldDyn (++) [] $ gateDyn websocketNotReady wsUp
-        let send = fmap (fmap (LBS.toStrict . encode)) $ leftmost [ gateDyn websocketReady wsUp
-                                                                  , tag (current buffer) (_webSocket_open ws)
-                                                                  ]
-    return $ (fmap (decode' . LBS.fromStrict)$ _webSocket_recv ws, _webSocket_open ws)
+        let send = (fmap (LBS.toStrict . encode)) <$> leftmost
+                     [ gateDyn websocketReady wsUp
+                     , tag (current buffer) (_webSocket_open ws)
+                     ]
+    let rawReceived = _webSocket_recv ws
+    return $ (decode' . LBS.fromStrict <$> rawReceived, _webSocket_open ws)
