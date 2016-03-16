@@ -12,8 +12,6 @@ module HSnippet.Shared.Common
 
 ------------------------------------------------------------------------------
 #ifndef __GHCJS__
-import           Data.Pool
-import           Database.Groundhog (DefaultKey)
 import           Database.Groundhog.Core
 import           Database.Groundhog.Postgresql
 import           Database.Groundhog.TH

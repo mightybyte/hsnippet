@@ -84,11 +84,11 @@ buildSnippet snippet = do
           exists <- doesDirectoryExist (sbRoot sb </> "Main.jsexe")
           return (exists, o, e)
     case res of
-      Just (True, o, e) -> do
+      Just (True, o, _) -> do
           setupResults sb
           writeFile (sbRoot sb </> "success") "success"
           return (o, True)
-      Just (False, o, e) -> return (e, False)
+      Just (False, _, e) -> return (e, False)
       Nothing -> return ("Failed with no output", False)
   where
     sb = mkSnippetBlob snippet
@@ -100,6 +100,7 @@ buildSnippet snippet = do
       , "main = appMain \"snippet-output\" app"
       ]
 
+nixShellCmd :: String -> String
 nixShellCmd cmd =
     unwords $ "nix-shell" : nixArgs
   where
@@ -111,6 +112,7 @@ nixShellCmd cmd =
               , "\"" ++ cmd ++ "; exit $?\""
               ]
 
+ghcjsBuildCmd :: SnippetBlob -> String -> String
 ghcjsBuildCmd sb outDir = unwords
     [ "ghcjs"
     , "--make"
@@ -135,14 +137,15 @@ ghcjsBuildCmd sb outDir = unwords
 
 setupResults :: SnippetBlob -> IO ()
 setupResults sb = do
-    system $ unwords [ "cat"
-                     , jsexe </> "out.js"
-                     , jsexe </> "runmain.js"
-                     , ">", sbRoot sb </> "out.js"
-                     ]
+    _ <- system $ unwords
+           [ "cat"
+           , jsexe </> "out.js"
+           , jsexe </> "runmain.js"
+           , ">", sbRoot sb </> "out.js"
+           ]
     copyFile (jsexe </> "rts.js") (sbRoot sb </> "rts.js")
     copyFile (jsexe </> "lib.js") (sbRoot sb </> "lib.js")
-    rawSystem "gzip" ["-k", "-f", sbRoot sb </> "out.js"]
+    _ <- rawSystem "gzip" ["-k", "-f", sbRoot sb </> "out.js"]
     copyFile (buildRoot </> "template.html") (sbRoot sb </> "index.html")
     T.appendFile (sbRoot sb </> "index.html") (T.pack htmlSuffix)
   where

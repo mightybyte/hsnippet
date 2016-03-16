@@ -4,7 +4,6 @@
 module Main where
 
 ------------------------------------------------------------------------------
-import           Control.Monad
 import qualified Data.Text.IO         as T
 import           System.Environment
 import           HSnippet.BuildTypes

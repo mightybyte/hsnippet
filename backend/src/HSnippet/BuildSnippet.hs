@@ -7,16 +7,10 @@ module HSnippet.BuildSnippet where
 import           Control.Monad
 import           Control.Monad.Trans
 import           Data.Aeson
-import           Data.Digest.Pure.SHA
 import           Data.String.Conv
-import qualified Data.Text.IO         as T
-import           Data.Text            (Text)
 import           Snap.Core
 import           Snap.Snaplet
 import           System.Directory
-import           System.Exit
-import           System.FilePath
-import           System.Process
 ------------------------------------------------------------------------------
 import           HSnippet.BuildTypes
 import           HSnippet.Types.App

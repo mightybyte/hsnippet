@@ -49,7 +49,6 @@ module GroundhogAuth
 
 ------------------------------------------------------------------------------
 import           Prelude
-import           Control.Applicative
 import qualified Control.Exception as E
 import           Control.Monad.Trans.Control
 import           Control.Monad.Logger

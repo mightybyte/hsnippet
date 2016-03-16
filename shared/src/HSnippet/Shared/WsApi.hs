@@ -3,10 +3,7 @@
 module HSnippet.Shared.WsApi where
 
 ------------------------------------------------------------------------------
-import Data.Aeson
 import Data.Aeson.TH
-import Data.Text (Text)
-import Data.Time.Clock
 ------------------------------------------------------------------------------
 import HSnippet.Shared.Types.Package
 ------------------------------------------------------------------------------

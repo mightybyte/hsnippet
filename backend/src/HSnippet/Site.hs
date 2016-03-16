@@ -13,14 +13,11 @@ import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.Reader
-import           Control.Monad.Trans
 import           Data.Aeson
 import           Data.ByteString (ByteString)
 import           Data.Configurator
 import           Data.Configurator.Types
-import           Data.Monoid
 import           Data.String.Conv
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Database.Groundhog
 import           Database.Groundhog.Core
@@ -39,7 +36,6 @@ import           System.IO
 import           GroundhogAuth
 import           HSnippet.BuildSnippet
 import           HSnippet.BuildTypes
-import           HSnippet.Reload
 import           HSnippet.Types.App
 import           HSnippet.Shared.Types.Package
 import           HSnippet.Shared.Types.Snippet
@@ -50,7 +46,7 @@ import           HSnippet.Shared.WsApi
 ------------------------------------------------------------------------------
 -- | Render login form
 handleLogin :: Maybe T.Text -> Handler App (AuthManager App) ()
-handleLogin authError = render "login"
+handleLogin _ = render "login"
 
 
 ------------------------------------------------------------------------------
@@ -96,6 +92,7 @@ routes = [ ("login",       with auth handleLoginSubmit)
          ]
 
 
+packagesHandler :: Handler App App ()
 packagesHandler = do
     ps <- asks (_snippetPackages . _appState)
     writeText $ T.unlines $ map packageName ps
@@ -120,27 +117,28 @@ migrateDB = do
       migrate (undefined :: Snippet)
 
 ------------------------------------------------------------------------------
-lookupFail
-    :: (Show b, Configured b)
-    => String
-    -- ^ A default value
-    -> Config
-    -> Text
-    -- ^ Key beeing looked up
-    -> IO b
-lookupFail def cfg key = do
-    val <- lookupDefault (error msg) cfg key
-    putStrLn $ "Configured " <> T.unpack key <> " = " <> show val
-    return val
-  where
-    msg = "Missing config option " <> T.unpack key <>
-          "! (usually defaults to \"" <> def <> "\")"
+--lookupFail
+--    :: (Show b, Configured b)
+--    => String
+--    -- ^ A default value
+--    -> Config
+--    -> Text
+--    -- ^ Key beeing looked up
+--    -> IO b
+--lookupFail def cfg key = do
+--    val <- lookupDefault (error msg) cfg key
+--    putStrLn $ "Configured " <> T.unpack key <> " = " <> show val
+--    return val
+--  where
+--    msg = "Missing config option " <> T.unpack key <>
+--          "! (usually defaults to \"" <> def <> "\")"
 
 
+buildAppState :: Config -> IO AppState
 buildAppState conf = do
     let cfg = subconfig "postgres" conf
-    connstr <- liftIO $ getConnectionString cfg
-    ghPool <- liftIO $ withPostgresqlPool (toS connstr) 3 return
+    connstr <- getConnectionString cfg
+    ghPool <- withPostgresqlPool (toS connstr) 3 return
 
     ps <- getBuildEnvPackages
 
@@ -158,12 +156,12 @@ app = makeSnaplet "app" "An snaplet example application." Nothing $ do
            initCookieSessionManager "site_key.txt" "sess" Nothing (Just 3600)
 
     conf <- getSnapletUserConfig
-    appState <- liftIO $ buildAppState conf
-    liftIO $ runNoLoggingT (withConn (runDbPersist migrateDB) (_db appState))
+    as <- liftIO $ buildAppState conf
+    liftIO $ runNoLoggingT (withConn (runDbPersist migrateDB) (_db as))
 
     --a <- nestSnaplet "auth" auth $
     --       initJsonFileAuthManager defAuthSettings sess "users.json"
-    a <- nestSnaplet "auth" auth $ initGroundhogAuth sess (_db appState)
+    a <- nestSnaplet "auth" auth $ initGroundhogAuth sess (_db as)
     addRoutes routes
     addAuthSplices h auth
 
@@ -172,5 +170,5 @@ app = makeSnaplet "app" "An snaplet example application." Nothing $ do
     --ar <- liftIO $ lookupFail "true" conf "autoreload-templates"
     --when ar $ liftIO $ autoReloadHeist "/heistReload" ["snaplets/heist"]
 
-    return $ App h s a appState
+    return $ App h s a as
 
