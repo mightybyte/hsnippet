@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
@@ -12,6 +13,8 @@ import           Data.String.Conv
 import qualified Data.Text            as T
 import qualified Data.Text.IO         as T
 import           Data.Text            (Text)
+import qualified Data.Text            as T
+import           Data.Text.Encoding
 import           System.Directory
 import           System.FilePath
 import           System.Process
@@ -75,9 +78,16 @@ buildSnippet snippet = do
       liftIO $ do
           putStrLn $ "Building " ++ (sbRoot sb </> file)
           createDirectoryIfMissing True (sbRoot sb)
-          copyFile (buildRoot </> "template.hs") (sbRoot sb </> "Main.hs")
-          T.appendFile (sbRoot sb </> "Main.hs") suffix
-          let cp = (shell $ nixShellCmd $ ghcjsBuildCmd sb outDir) { cwd = Just buildRoot }
+          let mainFile = sbRoot sb </> "Main.hs"
+          prefix <- T.readFile (buildRoot </> "template.hs")
+          let !fullSnippet = prefix <> T.unlines
+                [ snippet
+                , "main :: IO ()"
+                , "main = appMain \"snippet-output\" app"
+                ]
+          T.writeFile mainFile fullSnippet
+          let cp = (shell $ nixShellCmd $ ghcjsBuildCmd sb outDir)
+                     { cwd = Just buildRoot }
           (_, o, e) <- readCreateProcessWithExitCode cp ""
           writeFile (sbRoot sb </> "run-stdout.txt") o
           writeFile (sbRoot sb </> "run-stderr.txt") e
@@ -94,11 +104,6 @@ buildSnippet snippet = do
     sb = mkSnippetBlob snippet
     file = sbName sb <.> "snippet"
     outDir = sbInnerRoot sb </> "dist"
-    suffix = T.unlines
-      [ snippet
-      , "main :: IO ()"
-      , "main = appMain \"snippet-output\" app"
-      ]
 
 nixShellCmd :: String -> String
 nixShellCmd cmd =
@@ -146,8 +151,8 @@ setupResults sb = do
     copyFile (jsexe </> "rts.js") (sbRoot sb </> "rts.js")
     copyFile (jsexe </> "lib.js") (sbRoot sb </> "lib.js")
     _ <- rawSystem "gzip" ["-k", "-f", sbRoot sb </> "out.js"]
-    copyFile (buildRoot </> "template.html") (sbRoot sb </> "index.html")
-    T.appendFile (sbRoot sb </> "index.html") (T.pack htmlSuffix)
+    htmlPrefix <- T.readFile (buildRoot </> "template.html")
+    T.writeFile (sbRoot sb </> "index.html") (htmlPrefix <> T.pack htmlSuffix)
   where
     jsexe = sbRoot sb </> "Main.jsexe"
     htmlSuffix = "<script language='javascript' src='/" <> (sbInnerRoot sb </> "out.js") <>
