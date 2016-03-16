@@ -30,7 +30,6 @@ module HSnippet.Tabs
 ------------------------------------------------------------------------------
 import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Monoid
 import           Reflex
 import           Reflex.Dom
 ------------------------------------------------------------------------------

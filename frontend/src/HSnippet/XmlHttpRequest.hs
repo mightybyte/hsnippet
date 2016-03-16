@@ -5,7 +5,6 @@ module HSnippet.XmlHttpRequest where
 
 ------------------------------------------------------------------------------
 import           Data.Aeson
-import qualified Data.Text as T
 import           Reflex.Dom hiding (getKeyEvent)
 import           Reflex.Dom.Contrib.Xhr
 ------------------------------------------------------------------------------

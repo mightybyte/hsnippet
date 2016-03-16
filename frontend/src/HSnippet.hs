@@ -13,6 +13,8 @@ module HSnippet where
 
 ------------------------------------------------------------------------------
 import           Control.Monad
+import           Data.Aeson
+import qualified Data.ByteString.Lazy as LBS
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Monoid
@@ -43,6 +45,9 @@ data Output t = Output
     { buildStatus :: Dynamic t BuildStatus
     }
 
+gateDyn :: Reflex t => Dynamic t Bool -> Event t a -> Event t a
+gateDyn d e = attachDynWithMaybe (\b a -> if b then Just a else Nothing) d e
+
 openWebSocket
     :: MonadWidget t m
     => Event t [Up]
@@ -50,19 +55,19 @@ openWebSocket
 openWebSocket wsUp = do
     wv <- askWebView
     host <- getLocationHost wv
-      protocol <- getLocationProtocol wv
-        let wsProtocol = case protocol of
-              "" -> "ws:" -- We're in GHC
-              "about:" -> "ws:" -- We're in GHC
-              "file:" -> "ws:"
-              "http:" -> "ws:"
-              "https:" -> "wss:"
-              _ -> error $ "Unrecognized protocol: " <> show protocol
-            wsHost = case protocol of
-              "" -> "localhost:8000" -- We're in GHC
-              "about:" -> "localhost:8000" -- We're in GHC
-              "file:" -> "localhost:8000"
-              _ -> host
+    protocol <- getLocationProtocol wv
+    let wsProtocol = case protocol of
+          "" -> "ws:" -- We're in GHC
+          "about:" -> "ws:" -- We're in GHC
+          "file:" -> "ws:"
+          "http:" -> "ws:"
+          "https:" -> "wss:"
+          _ -> error $ "Unrecognized protocol: " <> show protocol
+        wsHost = case protocol of
+          "" -> "localhost:8000" -- We're in GHC
+          "about:" -> "localhost:8000" -- We're in GHC
+          "file:" -> "localhost:8000"
+          _ -> host
     rec ws <- webSocket (wsProtocol <> "//" <> wsHost <> "/ws") $
           def & webSocketConfig_send .~ send
         websocketReady <- holdDyn False $ fmap (const True) $ _webSocket_open ws
@@ -72,6 +77,20 @@ openWebSocket wsUp = do
                                                                   , tag (current buffer) (_webSocket_open ws)
                                                                   ]
     return $ (fmap (decode' . LBS.fromStrict)$ _webSocket_recv ws, _webSocket_open ws)
+
+appController
+    :: MonadWidget t m
+    => Menu t
+    -> Snippet t
+    -> m (Output t)
+appController mData inData = do
+    newCode <- buildCode $ tagDyn (snippetCode inData) (runEvent mData)
+    code <- holdDyn Nothing $ traceEvent "newCode2" newCode
+    status <- holdDyn NotBuilt $ leftmost
+      [ Building <$ runEvent mData
+      , maybe BuildFailed Built <$> updated code
+      ]
+    return $ Output status
 
 runApp :: MonadWidget t m => App t m ()
 runApp = do
