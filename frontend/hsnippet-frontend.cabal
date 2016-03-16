@@ -53,7 +53,7 @@ executable hsnippet-frontend
     build-depends: ghcjs-base
 
   ghc-options: -O2 -Wall -fno-warn-unused-do-bind -fno-warn-orphans
-  cpp-options: -D_GHCJS_ -DGHCJS_GC_INTERVAL=60000 -D__GHCJS__
+  cpp-options: -D_GHCJS_ -DGHCJS_GC_INTERVAL=60000
 
   default-language:    Haskell2010
 
