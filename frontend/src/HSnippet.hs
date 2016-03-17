@@ -61,6 +61,7 @@ menu buildStatus = do
         return ()
       divClass "right menu" $ do
         runAttrs <- mapDyn mkRunAttrs buildStatus
+        loadClick <- icon "file code outline" runAttrs "Load Example"
         runClick <- icon "play" runAttrs "Run"
         elAttr "a" ("class" =: "item" <> "href" =: "/logout") $
           text "Sign Out"
@@ -94,22 +95,21 @@ rightColumn fs = do
     divClass "right column full-height" $ rightTabs fs
     return ()
 
-data OutputTab = AppTab | ConsoleTab | OutTab | PackagesTab
+data OutputTab = AppTab | OutTab | PackagesTab
   deriving (Eq,Show,Ord,Enum)
 
 showTab :: OutputTab -> String
 showTab AppTab = "App"
-showTab ConsoleTab = "Console"
-showTab OutTab = "Incremental"
+showTab OutTab = "Console"
 showTab PackagesTab = "Packages"
 
 setTabFromBuildStatus :: BuildStatus -> OutputTab
 setTabFromBuildStatus (Built br) =
     if brSuccess br
       then AppTab
-      else ConsoleTab
+      else OutTab
 setTabFromBuildStatus Building = OutTab
-setTabFromBuildStatus _ = ConsoleTab
+setTabFromBuildStatus _ = OutTab
 
 instance MonadWidget t m => Tab t m OutputTab where
     tabIndicator t active = do
@@ -122,14 +122,11 @@ rightTabs :: MonadWidget t m => FrontendState t -> m ()
 rightTabs fs = do
     let buildStatus = fsBuildStatus fs
     curTab <- divClass "ui top attached menu" $ do
-      tabBar ConsoleTab [AppTab, ConsoleTab, OutTab, PackagesTab] never
+      tabBar OutTab [AppTab, OutTab, PackagesTab] never
              (setTabFromBuildStatus <$> updated buildStatus)
     tabPane tabAttrs curTab AppTab $ do
       divClass "segment full-height" $ do
         widgetHoldHelper jsOutput NotBuilt $ updated buildStatus
-    tabPane tabAttrs curTab ConsoleTab $ do
-      divClass "grey segment full-height console-out" $ do
-        widgetHoldHelper consoleOutput NotBuilt $ updated buildStatus
     tabPane tabAttrs curTab OutTab $ do
       divClass "grey segment full-height console-out" $ do
         elAttr "div" incrAttrs $ buildMessagesWidget fs
@@ -181,16 +178,6 @@ buildMessageWidget (Right bm) = do
     elDynAttr "tr" attrs $ do
       elClass "td" "collapsing" blank
       el "td" $ el "pre" $ text (T.unpack $ T.unlines $ _bmLines bm)
-
-consoleOutput :: MonadWidget t m => BuildStatus -> m ()
-consoleOutput NotBuilt = do
-    el "p" $ text "This is where the snippet's output will go."
-consoleOutput Building = loading
-consoleOutput BuildFailed = do
-    elClass "h2" "red text" $ text "Server Error"
-    elClass "p" "text" $ text "There was an unexpected problem"
-consoleOutput (Built br) = do
-    el "pre" $ text $ brConsoleOut br
 
 jsOutput :: MonadWidget t m => BuildStatus -> m ()
 jsOutput NotBuilt = do

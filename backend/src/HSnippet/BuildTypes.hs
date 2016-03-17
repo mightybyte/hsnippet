@@ -112,6 +112,7 @@ buildSnippet runner snippet = do
     file = sbName sb <.> "snippet"
     outDir = sbInnerRoot sb </> "dist"
 
+------------------------------------------------------------------------------
 runProcessIncremental
     :: Connection
     -> CreateProcess
@@ -133,6 +134,8 @@ runProcessIncremental conn cp sb templateLines = do
       oOpen <- checkSendLine Down_BuildOutLine o oFile
       eOpen <- checkSendLine Down_BuildOutLine e eFile
       if oOpen || eOpen then loop o e else return ()
+    cleanupStr = sbInnerRoot sb <> "/"
+    cleanupFilenames = T.replace (T.pack cleanupStr) ""
     checkSendLine msg h f = do
       closed <- hIsClosed h
       if closed
@@ -140,7 +143,8 @@ runProcessIncremental conn cp sb templateLines = do
         else do input <- grabLines [] h
                 when (not $ null input) $ do
                   appendFile f $ unlines input
-                  let parsed = outParser $ map T.pack input
+                  let parsed = outParser $
+                        map (cleanupFilenames . T.pack) input
                   wsSend conn $ msg $ fixLineNumbers templateLines parsed
                 return True
 

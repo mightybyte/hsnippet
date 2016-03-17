@@ -4,12 +4,10 @@
 module HSnippet.Shared.OutputParser where
 
 ------------------------------------------------------------------------------
-import           Control.Applicative
 import           Data.Attoparsec.Text
 import           Data.Char
 import           Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.IO as T
 ------------------------------------------------------------------------------
 import           HSnippet.Shared.Types.BuildMessage
 ------------------------------------------------------------------------------
