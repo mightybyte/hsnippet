@@ -31,6 +31,7 @@ import           Text.Printf
 import           HSnippet.FrontendState
 import           HSnippet.Lib
 import           HSnippet.Tabs
+import           HSnippet.Shared.Types.ExampleSnippet
 import           HSnippet.Shared.Types.BuildMessage
 import           HSnippet.Shared.Types.BuildResults
 import           HSnippet.Shared.Types.Package
@@ -38,21 +39,22 @@ import           HSnippet.Shared.Types.Package
 
 data Menu t = Menu
     { runEvent :: Event t ()
+    , loadExample :: Event t ExampleSnippet
     }
 
 runApp :: MonadWidget t m => App t m ()
 runApp = do
-    rec mData <- menu (fsBuildStatus fs2)
+    rec mData <- menu fs2
         fs2 <- elAttr "div" ("class" =: "ui two column padded grid" <>
                       "style" =: "height: calc(100% - 40px)") $ do
-          inData <- leftColumn
+          inData <- leftColumn (loadExample mData)
           fs1 <- stateManager inData (runEvent mData)
           rightColumn fs1
           return fs1
     return ()
 
-menu :: MonadWidget t m => Dynamic t BuildStatus -> m (Menu t)
-menu buildStatus = do
+menu :: MonadWidget t m => FrontendState t -> m (Menu t)
+menu fs = do
     divClass "ui blue inverted attached borderless menu" $ do
       elClass "span" "item active" $ text "HSnippet"
       elClass "span" "item" $ do
@@ -60,25 +62,48 @@ menu buildStatus = do
             titleEdits <- editInPlace (constant True) title
         return ()
       divClass "right menu" $ do
-        runAttrs <- mapDyn mkRunAttrs buildStatus
-        loadClick <- icon "file code outline" runAttrs "Load Example"
+        runAttrs <- mapDyn mkRunAttrs (fsBuildStatus fs)
+        loadClick <- examplesDropdown (fsExamples fs)
         runClick <- icon "play" runAttrs "Run"
         elAttr "a" ("class" =: "item" <> "href" =: "/logout") $
           text "Sign Out"
-        return $ Menu runClick
+        return $ Menu runClick loadClick
   where
     mkRunAttrs Building = ("class" =: "disabled")
     mkRunAttrs _ = mempty
 
+examplesDropdown
+    :: MonadWidget t m
+    => Dynamic t [ExampleSnippet]
+    -> m (Event t ExampleSnippet)
+examplesDropdown exs = do
+    divClass "ui simple dropdown item" $ do
+      divClass "text" $ text "Examples"
+      divClass "menu" $ do
+        res <- widgetHold (return never) $
+          (liftM leftmost . mapM singleExample) <$> updated exs
+        return $ switch $ current res
+
+singleExample
+    :: MonadWidget t m
+    => ExampleSnippet
+    -> m (Event t ExampleSnippet)
+singleExample es = do
+    (e, _) <- elAttr' "div" ("class" =: "item") $
+                text $ exampleName es
+    return $ es <$ domEvent Click e
+
+
 ------------------------------------------------------------------------------
-leftColumn :: MonadWidget t m => m (Snippet t)
-leftColumn = do
+leftColumn :: MonadWidget t m => Event t ExampleSnippet -> m (Snippet t)
+leftColumn newExample = do
     ta <- divClass "left column full-height" $
       elClass "form" "ui form full-height" $ do
         elAttr "div" ("class" =: "field" <>
                       "style" =: "height: 100%") $ do
           textArea $ def & attributes .~ (constDyn $ "class" =: "code full-height")
                          & textAreaConfig_initialValue .~ example
+                         & setValue .~ (exampleCode <$> newExample)
     return $ Snippet (value ta)
   where
     --example = "main = appMain $ text \"aoeu\""
@@ -160,17 +185,17 @@ buildMessageWidget (Right bm) = do
         msg = printf "%s line %d, col %d: %s"
                 (over (element 0) toUpper klass) (_bmLine bm) (_bmCol bm)
                 (maybe "" (T.unpack . T.strip) $ atMay (_bmLines bm) 1)
-    rec isOpen <- toggle False clk2
-        clk2 <- elAttr "tr" ("class" =: klass) $ do
-          clk1 <- elClass "td" "collapsing" $ do
+    rec isOpen <- toggle False clk
+        clk <- elAttr "tr" ("class" =: klass) $ do
+          (e, _) <- elAttr' "td" ("class" =: "collapsing" <>
+                               "style" =: "cursor:pointer") $ do
             iconAttrs <- forDyn isOpen $ \open ->
               if open
                  then ("class" =: "minus icon")
                  else ("class" =: "plus icon")
-            (e, _) <- elDynAttr' "i" iconAttrs blank
-            return $ domEvent Click e
+            elDynAttr "i" iconAttrs blank
           el "td" $ el "pre" $ text msg
-          return clk1
+          return $ domEvent Click e
     attrs <- forDyn isOpen $ \open ->
       if open
         then ("class" =: klass)

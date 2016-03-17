@@ -16,12 +16,14 @@ import Snap.Snaplet.Heist
 import Snap.Snaplet.Auth
 import Snap.Snaplet.Session
 ------------------------------------------------------------------------------
+import HSnippet.Shared.Types.ExampleSnippet
 import HSnippet.Shared.Types.Package
 ------------------------------------------------------------------------------
 
 data AppState = AppState
-    { _db              :: Pool Postgresql
-    , _snippetPackages :: [Package]
+    { _appStateDb       :: Pool Postgresql
+    , _appStatePackages :: [Package]
+    , _appStateExamples :: [ExampleSnippet]
     }
 
 makeLenses ''AppState
@@ -40,8 +42,9 @@ instance HasHeist App where
     heistLens = subSnaplet heist
 
 instance ConnectionManager App Postgresql where
-    withConn f app = withConn f (_db $ _appState app)
-    withConnNoTransaction f app = withConnNoTransaction f (_db $ _appState app)
+    withConn f app = withConn f (_appStateDb $ _appState app)
+    withConnNoTransaction f app =
+      withConnNoTransaction f (_appStateDb $ _appState app)
 
 
 ------------------------------------------------------------------------------

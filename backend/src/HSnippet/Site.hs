@@ -30,12 +30,15 @@ import           Snap.Snaplet.Heist
 import           Snap.Snaplet.PostgresqlSimple (getConnectionString)
 import           Snap.Snaplet.Session.Backends.CookieSession
 import           Snap.Util.FileServe
+import           System.Directory
+import           System.FilePath
 import           System.IO
 ------------------------------------------------------------------------------
 import           GroundhogAuth
 import           HSnippet.BuildSnippet
 import           HSnippet.BuildTypes
 import           HSnippet.Types.App
+import           HSnippet.Shared.Types.ExampleSnippet
 import           HSnippet.Shared.Types.Package
 import           HSnippet.Shared.Types.Snippet
 import           HSnippet.Shared.WsApi
@@ -94,12 +97,13 @@ routes = [ ("login",       with auth handleLoginSubmit)
 
 packagesHandler :: Handler App App ()
 packagesHandler = do
-    ps <- asks (_snippetPackages . _appState)
+    ps <- asks (_appStatePackages . _appState)
     writeText $ T.unlines $ map packageName ps
 
 handleApi :: Handler App App ()
 handleApi = do
-  ps <- asks (_snippetPackages . _appState)
+  ps <- asks (_appStatePackages . _appState)
+  es <- asks (_appStateExamples . _appState)
   runWebSocketsSnap $ \pendingConn -> do
     conn <- acceptRequest pendingConn
     forever $ do
@@ -111,6 +115,9 @@ handleApi = do
         Right Up_GetPackages -> do
           liftIO $ putStrLn "Got Up_GetPackages"
           wsSend conn $ Down_Packages ps
+        Right Up_GetExamples -> do
+          liftIO $ putStrLn "Got Up_GetExamples"
+          wsSend conn $ Down_Examples es
         Right (Up_RunSnippet t) -> do
           liftIO $ putStrLn "Got Up_RunSnippet"
           handleRunSnippet conn t
@@ -140,6 +147,17 @@ migrateDB = do
 --          "! (usually defaults to \"" <> def <> "\")"
 
 
+getExamples :: IO [ExampleSnippet]
+getExamples = do
+    contents <- filter notDots <$> getDirectoryContents exampleDir
+    mapM mkExample contents
+  where
+    exampleDir = "userbuild/examples"
+    mkExample nm = do
+      code <- readFile (exampleDir </> nm)
+      return $ ExampleSnippet (dropExtension nm) code
+    notDots n = n /= "." && n /= ".."
+
 buildAppState :: Config -> IO AppState
 buildAppState conf = do
     let cfg = subconfig "postgres" conf
@@ -147,8 +165,10 @@ buildAppState conf = do
     ghPool <- withPostgresqlPool (toS connstr) 3 return
 
     ps <- getBuildEnvPackages
+    exs <- getExamples
+    mapM_ print exs
 
-    return $ AppState ghPool ps
+    return $ AppState ghPool ps exs
 
 ------------------------------------------------------------------------------
 -- | The application initializer.
@@ -163,11 +183,11 @@ app = makeSnaplet "app" "An snaplet example application." Nothing $ do
 
     conf <- getSnapletUserConfig
     as <- liftIO $ buildAppState conf
-    liftIO $ runNoLoggingT (withConn (runDbPersist migrateDB) (_db as))
+    liftIO $ runNoLoggingT (withConn (runDbPersist migrateDB) (_appStateDb as))
 
     --a <- nestSnaplet "auth" auth $
     --       initJsonFileAuthManager defAuthSettings sess "users.json"
-    a <- nestSnaplet "auth" auth $ initGroundhogAuth sess (_db as)
+    a <- nestSnaplet "auth" auth $ initGroundhogAuth sess (_appStateDb as)
     addRoutes routes
     addAuthSplices h auth
 

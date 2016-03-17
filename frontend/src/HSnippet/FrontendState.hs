@@ -24,6 +24,7 @@ import           Reflex.Dom
 ------------------------------------------------------------------------------
 import           HSnippet.Shared.Types.BuildMessage
 import           HSnippet.Shared.Types.BuildResults
+import           HSnippet.Shared.Types.ExampleSnippet
 import           HSnippet.Shared.Types.Package
 import           HSnippet.Shared.WsApi
 ------------------------------------------------------------------------------
@@ -36,9 +37,10 @@ data BuildStatus = NotBuilt | Building | BuildFailed | Built BuildResults
   deriving (Eq,Show,Ord)
 
 data FrontendState t = FrontendState
-    { fsPackages :: Dynamic t [Package]
+    { fsPackages    :: Dynamic t [Package]
     , fsBuildStatus :: Dynamic t BuildStatus
-    , fsBuildOut :: Dynamic t [Either Text BuildMessage]
+    , fsBuildOut    :: Dynamic t [Either Text BuildMessage]
+    , fsExamples    :: Dynamic t [ExampleSnippet]
     }
 
 mkBuildStatus
@@ -61,20 +63,21 @@ stateManager
     -> m (FrontendState t)
 stateManager inData buildSnippet = do
     pb <- getPostBuild
-    let upEvent = traceEventWith upSummary $ leftmost --mergeWith (++)
+    let upEvent = mergeWith (++) $ map (fmap (:[]))
           [ Up_GetPackages <$ pb
+          , Up_GetExamples <$ pb
           , Up_RunSnippet . toS <$>
               tagDyn (snippetCode inData) buildSnippet
           ]
-    (downEvent, _) <- openWebSocket ((:[]) <$> upEvent)
+    (downEvent, _) <- openWebSocket upEvent
     buildStatus <- mkBuildStatus downEvent buildSnippet
-    packages <- holdDyn [] $ fmapMaybe (isMsg _Down_Packages) $
-                  traceEventWith (maybe "Nothing" downSummary) downEvent
+    packages <- holdDyn [] $ fmapMaybe (isMsg _Down_Packages) downEvent
+    examples <- holdDyn [] $ fmapMaybe (isMsg _Down_Examples) downEvent
     buildOut <- foldDyn ($) [] $ leftmost
       [ (flip (++)) <$> fmapMaybe (isMsg _Down_BuildOutLine) downEvent
       , const [] <$ buildSnippet
       ]
-    return $ FrontendState packages buildStatus buildOut
+    return $ FrontendState packages buildStatus buildOut examples
 
 --foo :: Maybe Down -> Maybe [Package]
 isMsg :: Getting (First b) a b -> Maybe a -> Maybe b
