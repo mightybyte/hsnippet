@@ -5,6 +5,9 @@
 module HSnippet.BuildTypes where
 
 ------------------------------------------------------------------------------
+import           Control.Exception
+import           Control.Lens (over, each, _Right)
+import           Control.Monad
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Maybe
 import           Data.Digest.Pure.SHA
@@ -13,11 +16,18 @@ import           Data.String.Conv
 import qualified Data.Text            as T
 import qualified Data.Text.IO         as T
 import           Data.Text            (Text)
+--import           GHC.IO.Handle
+import           Network.WebSockets
 import           System.Directory
 import           System.FilePath
+import           System.IO
 import           System.Process
 ------------------------------------------------------------------------------
+import           HSnippet.Shared.OutputParser
+import           HSnippet.Shared.Types.BuildMessage
 import           HSnippet.Shared.Types.Package
+import           HSnippet.Shared.WsApi
+import           HSnippet.Websocket
 ------------------------------------------------------------------------------
 
 data SnippetBlob = SnippetBlob
@@ -69,8 +79,11 @@ getBuildEnvPackages = do
     (_, o, _) <- readCreateProcessWithExitCode cp ""
     return $ map (mkPackage . T.pack) $ filter (not . null) $ tail $ lines o
 
-buildSnippet :: Text -> IO (String, Bool)
-buildSnippet snippet = do
+buildSnippet
+    :: (CreateProcess -> SnippetBlob -> Int -> IO (Bool, String, String))
+    -> Text
+    -> IO (String, Bool)
+buildSnippet runner snippet = do
     res <- runMaybeT $ do
       hasBuildEnvironment
       liftIO $ do
@@ -86,11 +99,7 @@ buildSnippet snippet = do
           T.writeFile mainFile fullSnippet
           let cp = (shell $ nixShellCmd $ ghcjsBuildCmd sb outDir)
                      { cwd = Just buildRoot }
-          (_, o, e) <- readCreateProcessWithExitCode cp ""
-          writeFile (sbRoot sb </> "run-stdout.txt") o
-          writeFile (sbRoot sb </> "run-stderr.txt") e
-          exists <- doesDirectoryExist (sbRoot sb </> "Main.jsexe")
-          return (exists, o, e)
+          runner cp sb (length $ T.lines prefix)
     case res of
       Just (True, o, _) -> do
           setupResults sb
@@ -102,6 +111,73 @@ buildSnippet snippet = do
     sb = mkSnippetBlob snippet
     file = sbName sb <.> "snippet"
     outDir = sbInnerRoot sb </> "dist"
+
+runProcessIncremental
+    :: Connection
+    -> CreateProcess
+    -> SnippetBlob
+    -> Int
+    -> IO (Bool, String, String)
+runProcessIncremental conn cp sb templateLines = do
+    (_, Just o, Just e, _) <- createProcess $
+      cp { std_out = CreatePipe, std_err = CreatePipe }
+    catch (loop o e) handler1
+    oStr <- catch (readFile oFile) handler2
+    eStr <- catch (readFile eFile) handler2
+    exists <- doesDirectoryExist (sbRoot sb </> "Main.jsexe")
+    return (exists, oStr, eStr)
+  where
+    oFile = (sbRoot sb </> "run-stdout.txt")
+    eFile = (sbRoot sb </> "run-stderr.txt")
+    loop o e = do
+      oOpen <- checkSendLine Down_BuildOutLine o oFile
+      eOpen <- checkSendLine Down_BuildOutLine e eFile
+      if oOpen || eOpen then loop o e else return ()
+    checkSendLine msg h f = do
+      closed <- hIsClosed h
+      if closed
+        then return False
+        else do input <- grabLines [] h
+                when (not $ null input) $ do
+                  appendFile f $ unlines input
+                  let parsed = outParser $ map T.pack input
+                  wsSend conn $ msg $ fixLineNumbers templateLines parsed
+                return True
+
+fixLineNumbers
+    :: Int
+    -> [Either Text BuildMessage]
+    -> [Either Text BuildMessage]
+fixLineNumbers n = over (each . _Right . bmLine) (subtract n)
+
+grabLines :: [String] -> Handle -> IO [String]
+grabLines accum h = do
+    hasInput <- hWaitForInput h 10
+    if hasInput
+      then do
+        line <- hGetLine h
+        if null line
+           then return $ reverse accum
+           else grabLines (line : accum) h
+      else return $ reverse accum
+
+handler1 :: SomeException -> IO ()
+handler1 _ = return ()
+
+handler2 :: SomeException -> IO String
+handler2 _ = return ""
+
+runProcessBatch
+    :: CreateProcess
+    -> SnippetBlob
+    -> Int
+    -> IO (Bool, String, String)
+runProcessBatch cp sb _ = do
+    (_, o, e) <- readCreateProcessWithExitCode cp ""
+    writeFile (sbRoot sb </> "run-stdout.txt") o
+    writeFile (sbRoot sb </> "run-stderr.txt") e
+    exists <- doesDirectoryExist (sbRoot sb </> "Main.jsexe")
+    return (exists, o, e)
 
 nixShellCmd :: String -> String
 nixShellCmd cmd =

@@ -13,7 +13,6 @@ import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.Reader
-import           Data.Aeson
 import           Data.ByteString (ByteString)
 import           Data.Configurator
 import           Data.Configurator.Types
@@ -40,6 +39,7 @@ import           HSnippet.Types.App
 import           HSnippet.Shared.Types.Package
 import           HSnippet.Shared.Types.Snippet
 import           HSnippet.Shared.WsApi
+import           HSnippet.Websocket
 ------------------------------------------------------------------------------
 
 
@@ -103,23 +103,19 @@ handleApi = do
   runWebSocketsSnap $ \pendingConn -> do
     conn <- acceptRequest pendingConn
     forever $ do
-      upRaw <- receiveDataMessage conn
-      up <- return $ eitherDecode' $ dataToBs upRaw
+      up <- wsReceive conn
       case up of
         Left e -> do
           liftIO $ putStrLn $ "Websocket parse error: " ++ e
-          liftIO $ putStrLn $ "On message: " ++ show (dataToBs upRaw)
+          liftIO $ putStrLn $ "On message: " ++ show up
         Right Up_GetPackages -> do
           liftIO $ putStrLn "Got Up_GetPackages"
-          let d = encode $ Down_Packages ps
-          sendTextData conn d
-        _ -> liftIO $ putStrLn "No handler for this message"
+          wsSend conn $ Down_Packages ps
+        Right (Up_RunSnippet t) -> do
+          liftIO $ putStrLn "Got Up_RunSnippet"
+          handleRunSnippet conn t
       return ()
 
-
---dataToBs :: DataMessage -> ByteString
-dataToBs (Text bs) = bs
-dataToBs (Binary bs) = bs
 
 migrateDB :: (MonadIO m, PersistBackend m) => m ()
 migrateDB = do

@@ -9,7 +9,7 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
-module HSnippet.DBLayer where
+module HSnippet.FrontendState where
 
 ------------------------------------------------------------------------------
 import           Control.Lens
@@ -17,32 +17,68 @@ import           Control.Monad.Trans
 import           Data.Aeson
 import qualified Data.ByteString.Lazy as LBS
 import           Data.Monoid
+import           Data.String.Conv
+import           Data.Text (Text)
 import           Reflex
 import           Reflex.Dom
-import           Reflex.Dom.Contrib.Utils
 ------------------------------------------------------------------------------
+import           HSnippet.Shared.Types.BuildMessage
+import           HSnippet.Shared.Types.BuildResults
 import           HSnippet.Shared.Types.Package
 import           HSnippet.Shared.WsApi
 ------------------------------------------------------------------------------
 
-data DBLayer t = DBLayer
-    { dbPackages :: Dynamic t [Package]
+data Snippet t = Snippet
+    { snippetCode :: Dynamic t String
     }
 
-startDbLayer
-    :: MonadWidget t m
-    => Event t [Up]
-    -> m (DBLayer t)
-startDbLayer upEvents = do
-    rec (downEvents, startEvent) <- openWebSocket $ mergeWith (++)
-          [ [Up_GetPackages] <$ traceEvent "websocket opened" startEvent
-          , upEvents
-          ]
-    packages <- holdDyn [] $ fmapMaybe foo downEvents
-    return $ DBLayer $ traceDyn "packages" packages
+data BuildStatus = NotBuilt | Building | BuildFailed | Built BuildResults
+  deriving (Eq,Show,Ord)
 
-foo :: Maybe Down -> Maybe [Package]
-foo md = (^? _Down_Packages) =<< md
+data FrontendState t = FrontendState
+    { fsPackages :: Dynamic t [Package]
+    , fsBuildStatus :: Dynamic t BuildStatus
+    , fsBuildOut :: Dynamic t [Either Text BuildMessage]
+    }
+
+mkBuildStatus
+    :: MonadWidget t m
+    => Event t (Maybe Down)
+    -> Event t ()
+    -> m (Dynamic t BuildStatus)
+mkBuildStatus downEvents buildSnippet = do
+    holdDyn NotBuilt $ leftmost
+      [ Building <$ buildSnippet
+      , resultsToStatus <$> fmapMaybe (isMsg _Down_BuildFinished) downEvents
+      ]
+  where
+    resultsToStatus br = if brSuccess br then Built br else BuildFailed
+
+stateManager
+    :: MonadWidget t m
+    => Snippet t
+    -> Event t ()
+    -> m (FrontendState t)
+stateManager inData buildSnippet = do
+    pb <- getPostBuild
+    let upEvent = traceEventWith upSummary $ leftmost --mergeWith (++)
+          [ Up_GetPackages <$ pb
+          , Up_RunSnippet . toS <$>
+              tagDyn (snippetCode inData) buildSnippet
+          ]
+    (downEvent, _) <- openWebSocket ((:[]) <$> upEvent)
+    buildStatus <- mkBuildStatus downEvent buildSnippet
+    packages <- holdDyn [] $ fmapMaybe (isMsg _Down_Packages) $
+                  traceEventWith (maybe "Nothing" downSummary) downEvent
+    buildOut <- foldDyn ($) [] $ leftmost
+      [ (flip (++)) <$> fmapMaybe (isMsg _Down_BuildOutLine) downEvent
+      , const [] <$ buildSnippet
+      ]
+    return $ FrontendState packages buildStatus buildOut
+
+--foo :: Maybe Down -> Maybe [Package]
+isMsg :: Getting (First b) a b -> Maybe a -> Maybe b
+isMsg constructorPrism md = (^? constructorPrism) =<< md
 
 gateDyn :: Reflex t => Dynamic t Bool -> Event t a -> Event t a
 gateDyn d e = attachDynWithMaybe (\b a -> if b then Just a else Nothing) d e

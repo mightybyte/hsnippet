@@ -12,68 +12,47 @@
 module HSnippet where
 
 ------------------------------------------------------------------------------
+import           Control.Error
 import           Control.Lens
 import           Control.Monad
+import           Data.Char
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Monoid
 import           Data.String.Conv
+import           Data.Text (Text)
+import qualified Data.Text as T
 import           Reflex
 import           Reflex.Dom
 import           Reflex.Dom.Contrib.Utils
 import           Reflex.Dom.Contrib.Widgets.EditInPlace
+import           Text.Printf
 ------------------------------------------------------------------------------
-import           HSnippet.DBLayer
+import           HSnippet.FrontendState
 import           HSnippet.Lib
 import           HSnippet.Tabs
+import           HSnippet.Shared.Types.BuildMessage
 import           HSnippet.Shared.Types.BuildResults
 import           HSnippet.Shared.Types.Package
-import           HSnippet.XmlHttpRequest
 ------------------------------------------------------------------------------
 
 data Menu t = Menu
     { runEvent :: Event t ()
     }
 
-data Snippet t = Snippet
-    { snippetCode :: Dynamic t String
-    }
-
-data BuildStatus = NotBuilt | Building | BuildFailed | Built BuildResults
-  deriving (Eq,Show,Ord)
-
-data Output t = Output
-    { buildStatus :: Dynamic t BuildStatus
-    }
-
-appController
-    :: MonadWidget t m
-    => Menu t
-    -> Snippet t
-    -> m (Output t)
-appController mData inData = do
-    newCode <- buildCode $ tagDyn (snippetCode inData) (runEvent mData)
-    code <- holdDyn Nothing $ traceEvent "newCode2" newCode
-    status <- holdDyn NotBuilt $ leftmost
-      [ Building <$ runEvent mData
-      , maybe BuildFailed Built <$> updated code
-      ]
-    return $ Output status
-
 runApp :: MonadWidget t m => App t m ()
 runApp = do
-    db <- startDbLayer never
-    rec mData <- menu out
-        out <- elAttr "div" ("class" =: "ui two column padded grid" <>
+    rec mData <- menu (fsBuildStatus fs2)
+        fs2 <- elAttr "div" ("class" =: "ui two column padded grid" <>
                       "style" =: "height: calc(100% - 40px)") $ do
           inData <- leftColumn
-          outData <- appController mData inData
-          rightColumn db outData
-          return outData
+          fs1 <- stateManager inData (runEvent mData)
+          rightColumn fs1
+          return fs1
     return ()
 
-menu :: MonadWidget t m => Output t -> m (Menu t)
-menu outData = do
+menu :: MonadWidget t m => Dynamic t BuildStatus -> m (Menu t)
+menu buildStatus = do
     divClass "ui blue inverted attached borderless menu" $ do
       elClass "span" "item active" $ text "HSnippet"
       elClass "span" "item" $ do
@@ -81,7 +60,7 @@ menu outData = do
             titleEdits <- editInPlace (constant True) title
         return ()
       divClass "right menu" $ do
-        runAttrs <- mapDyn mkRunAttrs (buildStatus outData)
+        runAttrs <- mapDyn mkRunAttrs buildStatus
         runClick <- icon "play" runAttrs "Run"
         elAttr "a" ("class" =: "item" <> "href" =: "/logout") $
           text "Sign Out"
@@ -110,24 +89,26 @@ leftColumn = do
       , "  return ()"
       ]
 
-rightColumn :: MonadWidget t m => DBLayer t -> Output t -> m ()
-rightColumn db out = do
-    divClass "right column full-height" $ rightTabs db out
+rightColumn :: MonadWidget t m => FrontendState t -> m ()
+rightColumn fs = do
+    divClass "right column full-height" $ rightTabs fs
     return ()
 
-data OutputTab = ConsoleTab | AppTab | InfoTab
+data OutputTab = AppTab | ConsoleTab | OutTab | PackagesTab
   deriving (Eq,Show,Ord,Enum)
 
 showTab :: OutputTab -> String
-showTab ConsoleTab = "Console"
 showTab AppTab = "App"
-showTab InfoTab = "Info"
+showTab ConsoleTab = "Console"
+showTab OutTab = "Incremental"
+showTab PackagesTab = "Packages"
 
 setTabFromBuildStatus :: BuildStatus -> OutputTab
 setTabFromBuildStatus (Built br) =
     if brSuccess br
       then AppTab
       else ConsoleTab
+setTabFromBuildStatus Building = OutTab
 setTabFromBuildStatus _ = ConsoleTab
 
 instance MonadWidget t m => Tab t m OutputTab where
@@ -137,24 +118,65 @@ instance MonadWidget t m => Tab t m OutputTab where
       (e,_) <- elDynAttr' "a" attrs (text $ showTab t)
       return $ domEvent Click e
 
-rightTabs :: MonadWidget t m => DBLayer t -> Output t -> m ()
-rightTabs db Output{..} = do
+rightTabs :: MonadWidget t m => FrontendState t -> m ()
+rightTabs fs = do
+    let buildStatus = fsBuildStatus fs
     curTab <- divClass "ui top attached menu" $ do
-      tabBar ConsoleTab [ConsoleTab, AppTab, InfoTab] never
+      tabBar ConsoleTab [AppTab, ConsoleTab, OutTab, PackagesTab] never
              (setTabFromBuildStatus <$> updated buildStatus)
-    tabPane tabAttrs curTab ConsoleTab $ do
-      divClass "grey segment full-height console-out" $ do
-        widgetHoldHelper consoleOutput NotBuilt $ updated buildStatus
     tabPane tabAttrs curTab AppTab $ do
       divClass "segment full-height" $ do
         widgetHoldHelper jsOutput NotBuilt $ updated buildStatus
-    tabPane tabAttrs curTab InfoTab $ do
-      divClass "segment full-height" $ do
-        infoTab db
+    tabPane tabAttrs curTab ConsoleTab $ do
+      divClass "grey segment full-height console-out" $ do
+        widgetHoldHelper consoleOutput NotBuilt $ updated buildStatus
+    tabPane tabAttrs curTab OutTab $ do
+      divClass "grey segment full-height console-out" $ do
+        elAttr "div" incrAttrs $ buildMessagesWidget fs
+    tabPane tabAttrs curTab PackagesTab $ do
+      divClass "segment full-height console-out" $ do
+        packagesTab fs
     return ()
   where
+    incrAttrs = "class" =: "grey segment console-out" <>
+                "style" =: "height: 100%"
     tabAttrs = "class" =: "ui bottom attached segment" <>
                "style" =: "height: calc(100% - 40px)"
+
+------------------------------------------------------------------------------
+buildMessagesWidget :: MonadWidget t m => FrontendState t -> m ()
+buildMessagesWidget fs = do
+    elClass "table" "ui compact table" $
+      el "tbody" $
+        dyn =<< mapDyn (mapM buildMessageWidget) (fsBuildOut fs)
+    return ()
+
+buildMessageWidget :: MonadWidget t m => Either Text BuildMessage -> m ()
+buildMessageWidget (Left t) = do
+    el "tr" $ do
+      el "td" blank
+      el "td" $ el "pre" $ text $ toS t
+buildMessageWidget (Right bm) = do
+    let klass = case _bmType bm of
+                  BuildError -> "error"
+                  BuildWarning -> "warning"
+        msg = printf "%s line %d, col %d: %s"
+                (over (element 0) toUpper klass) (_bmLine bm) (_bmCol bm)
+                (maybe "" (T.unpack . T.strip) $ atMay (_bmLines bm) 1)
+    rec isOpen <- toggle False clk2
+        clk2 <- elAttr "tr" ("class" =: klass) $ do
+          clk1 <- elClass "td" "collapsing" $ do
+            (e, _) <- elAttr' "i" ("class" =: "plus icon") blank
+            return $ domEvent Click e
+          el "td" $ el "pre" $ text msg
+          return clk1
+    attrs <- forDyn isOpen $ \open ->
+      if open
+        then ("class" =: klass)
+        else ("class" =: klass <> "style" =: "display: none")
+    elDynAttr "tr" attrs $ do
+      elClass "td" "collapsing" blank
+      el "td" $ el "pre" $ text (T.unpack $ T.unlines $ _bmLines bm)
 
 consoleOutput :: MonadWidget t m => BuildStatus -> m ()
 consoleOutput NotBuilt = do
@@ -177,18 +199,19 @@ jsOutput (Built br) = do
     let file = "/snippets/"++brSnippetHash br++"/index.html"
     elAttr "iframe" ("src" =: file) blank
 
-infoTab
+packagesTab
     :: MonadWidget t m
-    => DBLayer t
+    => FrontendState t
     -> m ()
-infoTab db = do
-    packageMap <- mapDyn (M.fromList . zip [0..]) $ dbPackages db
+packagesTab fs = do
+    packageMap <- mapDyn (M.fromList . zip [0..]) $ fsPackages fs
     elClass "table" "ui striped table" $ do
-      el "tr" $ do
-        el "th" $ text "Package"
-        el "th" $ text "Version"
-        el "th" $ text "Docs"
-        el "th" $ text "Modules"
+      el "thead" $
+        el "tr" $ do
+          el "th" $ text "Package"
+          el "th" $ text "Version"
+          el "th" $ text "Docs"
+          el "th" $ text "Modules"
       listWithKey packageMap packageInfoWidget
       return ()
 
@@ -207,8 +230,10 @@ packageInfoWidget _ package = do
       el "td" $ elDynAttr "a" haddockAttrs $ text "docs"
       el "td" $ text "modules (not implemented yet)"
   where
-    mkHaddock Package{..} = "href" =:
-      (toS $ "http://hackage.haskell.org/package/" <> packageName <> "-" <> packageVersion)
+    mkHaddock Package{..} =
+      "href" =: (toS $ "http://hackage.haskell.org/package/" <>
+                       packageName <> "-" <> packageVersion) <>
+      "target" =: "_blank"
 
 icon
     :: MonadWidget t m

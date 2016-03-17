@@ -10,6 +10,6 @@ data BuildResults = BuildResults
     { brSnippetHash :: String
     , brConsoleOut  :: String
     , brSuccess     :: Bool
-    } deriving (Eq,Show,Ord)
+    } deriving (Eq,Ord,Show,Read)
 
 $(deriveJSON defaultOptions ''BuildResults)
