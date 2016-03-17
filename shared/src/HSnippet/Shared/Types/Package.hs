@@ -19,7 +19,7 @@ mkPackage t = Package name ver
   where
     rev = T.reverse t
     ver = T.reverse $ T.takeWhile (/= '-') rev
-    name = T.reverse $ T.tail $ T.dropWhile (/= '-') rev
+    name = T.strip $ T.reverse $ T.tail $ T.dropWhile (/= '-') rev
 
 deriveJSON defaultOptions ''Package
 
