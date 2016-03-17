@@ -4,10 +4,12 @@
 module HSnippet.Shared.OutputParser where
 
 ------------------------------------------------------------------------------
+import           Control.Applicative
 import           Data.Attoparsec.Text
 import           Data.Char
 import           Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.IO as T
 ------------------------------------------------------------------------------
 import           HSnippet.Shared.Types.BuildMessage
 ------------------------------------------------------------------------------
@@ -18,7 +20,7 @@ import           HSnippet.Shared.Types.BuildMessage
 outParser :: [Text] -> [Either Text BuildMessage]
 outParser [] = []
 outParser (l:ls) = do
-    case eitherResult $ parse messageStart l of
+    case parseOnly messageStart l of
       Left _ -> Left l : outParser ls
       Right tuple -> restParser tuple [l] ls
 
@@ -41,8 +43,11 @@ messageStart = do
     line <- decimal
     _ <- string ":"
     col <- decimal
-    _ <- string ": "
-    ty <- option BuildError (string "Warning:" >> return BuildWarning)
+    _ <- string ":"
+    ty <- choice
+      [ " Warning:" *> return BuildWarning
+      , many' anyChar >> endOfInput >> return BuildError
+      ]
     return (nm, line, col, ty)
 
 -- The rest are unused for now

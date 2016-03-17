@@ -166,7 +166,11 @@ buildMessageWidget (Right bm) = do
     rec isOpen <- toggle False clk2
         clk2 <- elAttr "tr" ("class" =: klass) $ do
           clk1 <- elClass "td" "collapsing" $ do
-            (e, _) <- elAttr' "i" ("class" =: "plus icon") blank
+            iconAttrs <- forDyn isOpen $ \open ->
+              if open
+                 then ("class" =: "minus icon")
+                 else ("class" =: "plus icon")
+            (e, _) <- elDynAttr' "i" iconAttrs blank
             return $ domEvent Click e
           el "td" $ el "pre" $ text msg
           return clk1
