@@ -3,7 +3,8 @@ app = do
   ti <- textInput $ TextInputConfig "range" "4" never
                     (constDyn $ "min" =: "1" <> "max" =: "6")
   n <- holdDyn (4::Int) (read <$> updated (value ti))
-  let f = reflexDia (def & sizeSpec .~ D.mkSizeSpec2D (Just 600) (Just 600)) . example
+  let diagramSize = D.mkSizeSpec2D (Just 600) (Just 600)
+      f = reflexDia (def & sizeSpec .~ diagramSize) . example
   el "div" $ widgetHoldHelper f 4 (updated n)
   return ()
 

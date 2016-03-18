@@ -106,13 +106,27 @@ leftColumn newExample = do
                          & setValue .~ (exampleCode <$> newExample)
     return $ Snippet (value ta)
   where
-    --example = "main = appMain $ text \"aoeu\""
     example = unlines
       [ "app :: MonadWidget t m => App t m ()"
       , "app = do"
-      , "  rec str <- holdDyn \"Click to edit me\" edits"
-      , "      edits <- editInPlace (constant True) str"
+      , "  ti <- textInput $ TextInputConfig \"range\" \"4\" never"
+      , "                    (constDyn $ \"min\" =: \"1\" <> \"max\" =: \"6\")"
+      , "  n <- holdDyn (4::Int) (read <$> updated (value ti))"
+      , "  let diagramSize = D.mkSizeSpec2D (Just 600) (Just 600)"
+      , "      f = reflexDia (def & sizeSpec .~ diagramSize) . example"
+      , "  el \"div\" $ widgetHoldHelper f 4 (updated n)"
       , "  return ()"
+      , ""
+      , "hilbert 0 = mempty"
+      , "hilbert n = hilbert' (n-1) D.# D.reflectY <> D.vrule 1"
+      , "         <> hilbert  (n-1) <> D.hrule 1"
+      , "         <> hilbert  (n-1) <> D.vrule (-1)"
+      , "         <> hilbert' (n-1) D.# D.reflectX"
+      , "  where"
+      , "    hilbert' m = hilbert m D.# D.rotateBy (1/4)"
+      , ""
+      , "example n = D.frame 1 . D.lw D.thin . D.lc D.darkred . D.fc D.white"
+      , "                  . D.strokeT $ hilbert n"
       ]
 
 rightColumn :: MonadWidget t m => FrontendState t -> m ()
@@ -227,7 +241,6 @@ packagesTab fs = do
           el "th" $ text "Package"
           el "th" $ text "Version"
           el "th" $ text "Docs"
-          el "th" $ text "Modules"
       listWithKey packageMap packageInfoWidget
       return ()
 
@@ -244,7 +257,6 @@ packageInfoWidget _ package = do
       el "td" $ dynText name
       el "td" $ dynText version
       el "td" $ elDynAttr "a" haddockAttrs $ text "docs"
-      el "td" $ text "modules (not implemented yet)"
   where
     mkHaddock Package{..} =
       "href" =: (toS $ "http://hackage.haskell.org/package/" <>
