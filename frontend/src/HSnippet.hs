@@ -118,7 +118,7 @@ startACE :: String -> IO AceRef
 startACE = js_startACE . toJSString
 
 foreign import javascript unsafe
-  "var res = ace['edit']($1); console.log('res: '+res); return res;"
+  "(function(){var res = ace['edit']($1); console['log']('res: '+res); return res;})()"
   js_startACE :: JSString -> IO AceRef
 #else
 startACE = error "startACE: can only be used with GHCJS"
@@ -142,7 +142,7 @@ aceGetValue :: AceRef -> IO String
 aceGetValue a = fromJSString <$> js_aceGetValue a
 
 foreign import javascript unsafe
-  "$1['getValue']();"
+  "(function(){ var val = $1['getValue'](); console.log('val: '+val); return val; })()"
   js_aceGetValue :: AceRef -> IO JSString
 #else
 aceGetValue = error "aceGetValue: can only be used with GHCJS"
@@ -199,7 +199,7 @@ leftColumn newExample = do
           --elAttr "div" ("class" =: "field") importsWidget
           elAttr "div" ("class" =: "field") $ do
             aceValue <- aceWidget example
-            dynText aceValue
+            divClass "ace-results" $ dynText aceValue
             return ()
             --textArea $ def & attributes .~ (constDyn $ "class" =: "code full-height")
             --               & textAreaConfig_initialValue .~ example
