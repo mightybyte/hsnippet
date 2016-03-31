@@ -13,6 +13,7 @@
   <body>
     <apply-content/>
 
+    <script src="/ace.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

@@ -1,13 +1,16 @@
-{-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE RecordWildCards       #-}
-{-# LANGUAGE RecursiveDo           #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE ConstraintKinds          #-}
+{-# LANGUAGE CPP                      #-}
+{-# LANGUAGE FlexibleContexts         #-}
+{-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE JavaScriptFFI            #-}
+{-# LANGUAGE MultiParamTypeClasses    #-}
+{-# LANGUAGE OverloadedStrings        #-}
+{-# LANGUAGE RecordWildCards          #-}
+{-# LANGUAGE RecursiveDo              #-}
+{-# LANGUAGE ScopedTypeVariables      #-}
+{-# LANGUAGE TypeFamilies             #-}
+{-# LANGUAGE UndecidableInstances     #-}
 
 module HSnippet where
 
@@ -15,14 +18,22 @@ module HSnippet where
 import           Control.Error
 import           Control.Lens
 import           Control.Monad
+import           Control.Monad.Trans
 import           Data.Char
+import           Data.Dependent.Sum (DSum (..))
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Monoid
 import           Data.String.Conv
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           GHCJS.DOM.Types hiding (Event, Text)
+#ifdef ghcjs_HOST_OS
+import           GHCJS.Foreign.Callback
+import           GHCJS.Types
+#endif
 import           Reflex
+import           Reflex.Host.Class
 import           Reflex.Dom
 import           Reflex.Dom.Contrib.Utils
 import           Reflex.Dom.Contrib.Widgets.EditInPlace
@@ -94,17 +105,107 @@ singleExample es = do
     return $ es <$ domEvent Click e
 
 
+newtype AceRef = AceRef { unAceRef :: JSVal }
+
+data ACE t = ACE
+    { aceRef :: AceRef
+    , aceValue :: Dynamic t String
+    }
+
+------------------------------------------------------------------------------
+startACE :: String -> IO AceRef
+#ifdef ghcjs_HOST_OS
+startACE = js_startACE . toJSString
+
+foreign import javascript unsafe
+  "var res = ace['edit']($1); console.log('res: '+res); return res;"
+  js_startACE :: JSString -> IO AceRef
+#else
+startACE = error "startACE: can only be used with GHCJS"
+#endif
+
+------------------------------------------------------------------------------
+moveCursorToPosition :: AceRef -> (Int, Int) -> IO ()
+#ifdef ghcjs_HOST_OS
+moveCursorToPosition a (r,c) = js_moveCursorToPosition a r c
+
+foreign import javascript unsafe
+  "$1['moveCursorToPosition']({row: $2, column: $3});"
+  js_moveCursorToPosition :: AceRef -> Int -> Int -> IO ()
+#else
+moveursorToPosition = error "moveCursorToPosition: can only be used with GHCJS"
+#endif
+
+------------------------------------------------------------------------------
+aceGetValue :: AceRef -> IO String
+#ifdef ghcjs_HOST_OS
+aceGetValue a = fromJSString <$> js_aceGetValue a
+
+foreign import javascript unsafe
+  "$1['getValue']();"
+  js_aceGetValue :: AceRef -> IO JSString
+#else
+aceGetValue = error "aceGetValue: can only be used with GHCJS"
+#endif
+
+------------------------------------------------------------------------------
+setupValueListener :: MonadWidget t m => AceRef -> m (Event t String)
+#ifdef ghcjs_HOST_OS
+setupValueListener ace = do
+    postGui <- askPostGui
+    runWithActions <- askRunWithActions
+    e <- newEventWithTrigger $ \et -> do
+          cb <- asyncCallback1 $ \_ -> liftIO $ do
+              v <- aceGetValue ace
+              postGui $ runWithActions [et :=> Identity v]
+          js_setupValueListener ace cb
+          return (return ())
+          -- TODO Probably need some kind of unsubscribe mechanism
+          --return $ liftIO unsubscribe
+    return $! e
+
+foreign import javascript unsafe
+  "$1['on'](\"change\", $2);"
+  js_setupValueListener :: AceRef -> Callback (JSVal -> IO ()) -> IO ()
+#else
+setupValueListener = error "setupValueListener: can only be used with GHCJS"
+#endif
+
+
+------------------------------------------------------------------------------
+aceWidget :: MonadWidget t m => String -> m (Dynamic t String)
+aceWidget initContents = do
+    let elemId = "editor"
+    elAttr "pre" ("id" =: elemId <> "class" =: "ui segment") $ text initContents
+
+    --------------------------------------------------------------------------
+    --ace <- liftIO $ startACE elemId
+    --editorUpdates <- setupValueListener ace
+
+    pb <- getPostBuild
+    aceUpdates <- performEvent (liftIO (startACE "editor") <$ pb)
+    res <- widgetHold (return never) $ setupValueListener <$> aceUpdates
+    let editorUpdates = switchPromptlyDyn res
+    --------------------------------------------------------------------------
+
+    holdDyn initContents editorUpdates
+
 ------------------------------------------------------------------------------
 leftColumn :: MonadWidget t m => Event t ExampleSnippet -> m (Snippet t)
 leftColumn newExample = do
     ta <- divClass "left column full-height" $
       elClass "form" "ui form full-height" $ do
-        elAttr "div" ("class" =: "field" <>
-                      "style" =: "height: 100%") $ do
-          textArea $ def & attributes .~ (constDyn $ "class" =: "code full-height")
-                         & textAreaConfig_initialValue .~ example
-                         & setValue .~ (exampleCode <$> newExample)
-    return $ Snippet (value ta)
+        elAttr "div" ("style" =: "height: 100%") $ do
+          --elAttr "div" ("class" =: "field") importsWidget
+          elAttr "div" ("class" =: "field") $ do
+            aceValue <- aceWidget example
+            dynText aceValue
+            return ()
+            --textArea $ def & attributes .~ (constDyn $ "class" =: "code full-height")
+            --               & textAreaConfig_initialValue .~ example
+            --               & setValue .~ (exampleCode <$> newExample)
+    --return $ Snippet (value ta)
+    return $ Snippet $ constDyn ""
   where
     example = unlines
       [ "app :: MonadWidget t m => App t m ()"
@@ -128,6 +229,59 @@ leftColumn newExample = do
       , "example n = D.frame 1 . D.lw D.thin . D.lc D.darkred . D.fc D.white"
       , "                  . D.strokeT $ hilbert n"
       ]
+
+importsWidget :: MonadWidget t m => m ()
+importsWidget = do
+    divClass "ui form" $ do
+        importDropdown
+    return ()
+
+
+data ImportType = PlainImport
+                | Qualified
+                | Hiding
+                | Explicit
+  deriving (Eq,Ord,Show,Read)
+
+
+importTypeNames :: Map ImportType String
+importTypeNames = M.fromList
+    [ (PlainImport, "")
+    , (Qualified, "qualified")
+    , (Hiding, "hiding")
+    , (Explicit, "explicit")
+    ]
+
+
+------------------------------------------------------------------------------
+importDropdown
+    :: MonadWidget t m
+    => m (Event t ())
+importDropdown = do
+    let initial = PlainImport
+    divClass "fields" $ do
+      divClass "field" $ el "label" $ text "Import"
+      v <- divClass "three wide field" $ do
+        dropdown initial (constDyn importTypeNames) $
+                 def & attributes .~ constDyn ("class" =: "ui fluid dropdown")
+      widgetHoldHelper importDetails initial (updated $ value v)
+    return never
+--  where
+--    opt t = elAttr "option" ("value" =: t) $ text t
+
+importDetails :: MonadWidget t m => ImportType -> m ()
+importDetails PlainImport = return ()
+importDetails Qualified = do
+    divClass "one wide field" $ text " as "
+    divClass "three wide field" $ textInput def
+    return ()
+importDetails Hiding = do
+    divClass "three wide field" $ textInput def
+    return ()
+importDetails Explicit = do
+    divClass "three wide field" $ textInput def
+    return ()
+
 
 rightColumn :: MonadWidget t m => FrontendState t -> m ()
 rightColumn fs = do

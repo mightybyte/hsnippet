@@ -8,7 +8,6 @@ module HSnippet.Lib
   ( App
   , AppState(..)
   , appMain
-  , waitUntilJust
   ) where
 
 ------------------------------------------------------------------------------
