@@ -51,7 +51,6 @@ import           HSnippet.Shared.Types.Package
 data Menu t = Menu
     { runEvent :: Event t ()
     , loadExample :: Event t ExampleSnippet
-    , moveClick :: Event t ()
     }
 
 runApp :: MonadWidget t m => App t m ()
@@ -76,11 +75,10 @@ menu fs = do
       divClass "right menu" $ do
         runAttrs <- mapDyn mkRunAttrs (fsBuildStatus fs)
         loadClick <- examplesDropdown (fsExamples fs)
-        mc <- button "Move"
         runClick <- icon "play" runAttrs "Run"
         elAttr "a" ("class" =: "item" <> "href" =: "/logout") $
           text "Sign Out"
-        return $ Menu runClick loadClick mc
+        return $ Menu runClick loadClick
   where
     mkRunAttrs Building = ("class" =: "disabled")
     mkRunAttrs _ = mempty
