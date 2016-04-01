@@ -149,6 +149,18 @@ aceGetValue = error "aceGetValue: can only be used with GHCJS"
 #endif
 
 ------------------------------------------------------------------------------
+setValueACE :: AceRef -> String -> IO ()
+#ifdef ghcjs_HOST_OS
+setValueACE a = js_aceSetValue a . toJSString
+
+foreign import javascript unsafe
+  "(function(){ $1['setValue']($2, -1); })()"
+  js_aceSetValue :: AceRef -> JSString -> IO ()
+#else
+setValueACE = error "setValueACE: can only be used with GHCJS"
+#endif
+
+------------------------------------------------------------------------------
 setupValueListener :: MonadWidget t m => AceRef -> m (Event t String)
 #ifdef ghcjs_HOST_OS
 setupValueListener ace = do
@@ -193,13 +205,21 @@ aceWidget initContents = do
 
 
 ------------------------------------------------------------------------------
+aceSetValue :: MonadWidget t m => ACE t -> Event t String -> m ()
+aceSetValue ace val =
+    performEvent_ $ attachDynWith f (aceRef ace) val
+  where
+    f Nothing pos = return ()
+    f (Just ref) pos = liftIO $ setValueACE ref pos
+
+
+------------------------------------------------------------------------------
 aceMoveCursor :: MonadWidget t m => ACE t -> Event t (Int,Int) -> m ()
 aceMoveCursor ace posE =
     performEvent_ $ attachDynWith f (aceRef ace) posE
   where
     f Nothing pos = return ()
-    f (Just ref) pos =
-      liftIO $ moveCursorToPosition ref pos
+    f (Just ref) pos = liftIO $ moveCursorToPosition ref pos
 
 
 ------------------------------------------------------------------------------
@@ -217,6 +237,7 @@ leftColumn newExample pos = do
             ace <- aceWidget example
             divClass "ace-results" $ dynText $ aceValue ace
             aceMoveCursor ace pos
+            aceSetValue ace (exampleCode <$> newExample)
             return ace
             --textArea $ def & attributes .~ (constDyn $ "class" =: "code full-height")
             --               & textAreaConfig_initialValue .~ example
