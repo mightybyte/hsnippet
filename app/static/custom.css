@@ -35,3 +35,8 @@ iframe {
     left: 0;
     right: 0;
 }
+
+pre a {
+    text-decoration: underline;
+    cursor: pointer;
+}

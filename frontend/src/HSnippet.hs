@@ -51,6 +51,7 @@ import           HSnippet.Shared.Types.Package
 data Menu t = Menu
     { runEvent :: Event t ()
     , loadExample :: Event t ExampleSnippet
+    , moveClick :: Event t ()
     }
 
 runApp :: MonadWidget t m => App t m ()
@@ -58,9 +59,9 @@ runApp = do
     rec mData <- menu fs2
         fs2 <- elAttr "div" ("class" =: "ui two column padded grid" <>
                       "style" =: "height: calc(100% - 40px)") $ do
-          inData <- leftColumn (loadExample mData)
-          fs1 <- stateManager inData (runEvent mData)
-          rightColumn fs1
+          rec inData <- leftColumn (loadExample mData) (roErrorJump ro)
+              fs1 <- stateManager inData (runEvent mData)
+              ro <- rightColumn fs1
           return fs1
     return ()
 
@@ -75,10 +76,11 @@ menu fs = do
       divClass "right menu" $ do
         runAttrs <- mapDyn mkRunAttrs (fsBuildStatus fs)
         loadClick <- examplesDropdown (fsExamples fs)
+        mc <- button "Move"
         runClick <- icon "play" runAttrs "Run"
         elAttr "a" ("class" =: "item" <> "href" =: "/logout") $
           text "Sign Out"
-        return $ Menu runClick loadClick
+        return $ Menu runClick loadClick mc
   where
     mkRunAttrs Building = ("class" =: "disabled")
     mkRunAttrs _ = mempty
@@ -108,7 +110,7 @@ singleExample es = do
 newtype AceRef = AceRef { unAceRef :: JSVal }
 
 data ACE t = ACE
-    { aceRef :: AceRef
+    { aceRef :: Dynamic t (Maybe AceRef)
     , aceValue :: Dynamic t String
     }
 
@@ -118,7 +120,7 @@ startACE :: String -> IO AceRef
 startACE = js_startACE . toJSString
 
 foreign import javascript unsafe
-  "(function(){var res = ace['edit']($1); console['log']('res: '+res); return res;})()"
+  "(function(){ var a = ace['edit']($1); a.session.setMode(\"ace/mode/haskell\"); return a; })()"
   js_startACE :: JSString -> IO AceRef
 #else
 startACE = error "startACE: can only be used with GHCJS"
@@ -130,7 +132,7 @@ moveCursorToPosition :: AceRef -> (Int, Int) -> IO ()
 moveCursorToPosition a (r,c) = js_moveCursorToPosition a r c
 
 foreign import javascript unsafe
-  "$1['moveCursorToPosition']({row: $2, column: $3});"
+  "(function(){ $1['gotoLine']($2, $3, true); })()"
   js_moveCursorToPosition :: AceRef -> Int -> Int -> IO ()
 #else
 moveursorToPosition = error "moveCursorToPosition: can only be used with GHCJS"
@@ -142,7 +144,7 @@ aceGetValue :: AceRef -> IO String
 aceGetValue a = fromJSString <$> js_aceGetValue a
 
 foreign import javascript unsafe
-  "(function(){ var val = $1['getValue'](); console.log('val: '+val); return val; })()"
+  "(function(){ return $1['getValue'](); })()"
   js_aceGetValue :: AceRef -> IO JSString
 #else
 aceGetValue = error "aceGetValue: can only be used with GHCJS"
@@ -165,7 +167,7 @@ setupValueListener ace = do
     return $! e
 
 foreign import javascript unsafe
-  "$1['on'](\"change\", $2);"
+  "(function(){ $1['on'](\"change\", $2); })()"
   js_setupValueListener :: AceRef -> Callback (JSVal -> IO ()) -> IO ()
 #else
 setupValueListener = error "setupValueListener: can only be used with GHCJS"
@@ -173,7 +175,7 @@ setupValueListener = error "setupValueListener: can only be used with GHCJS"
 
 
 ------------------------------------------------------------------------------
-aceWidget :: MonadWidget t m => String -> m (Dynamic t String)
+aceWidget :: MonadWidget t m => String -> m (ACE t)
 aceWidget initContents = do
     let elemId = "editor"
     elAttr "pre" ("id" =: elemId <> "class" =: "ui segment") $ text initContents
@@ -185,27 +187,44 @@ aceWidget initContents = do
     pb <- getPostBuild
     aceUpdates <- performEvent (liftIO (startACE "editor") <$ pb)
     res <- widgetHold (return never) $ setupValueListener <$> aceUpdates
-    let editorUpdates = switchPromptlyDyn res
+    aceDyn <- holdDyn Nothing $ Just <$> aceUpdates
+    updatesDyn <- holdDyn initContents $ switchPromptlyDyn res
     --------------------------------------------------------------------------
 
-    holdDyn initContents editorUpdates
+    return $ ACE aceDyn updatesDyn
+
 
 ------------------------------------------------------------------------------
-leftColumn :: MonadWidget t m => Event t ExampleSnippet -> m (Snippet t)
-leftColumn newExample = do
-    ta <- divClass "left column full-height" $
+aceMoveCursor :: MonadWidget t m => ACE t -> Event t (Int,Int) -> m ()
+aceMoveCursor ace posE =
+    performEvent_ $ attachDynWith f (aceRef ace) posE
+  where
+    f Nothing pos = return ()
+    f (Just ref) pos =
+      liftIO $ moveCursorToPosition ref pos
+
+
+------------------------------------------------------------------------------
+leftColumn
+    :: MonadWidget t m
+    => Event t ExampleSnippet
+    -> Event t (Int,Int)
+    -> m (Snippet t)
+leftColumn newExample pos = do
+    ace <- divClass "left column full-height" $
       elClass "form" "ui form full-height" $ do
         elAttr "div" ("style" =: "height: 100%") $ do
           --elAttr "div" ("class" =: "field") importsWidget
           elAttr "div" ("class" =: "field") $ do
-            aceValue <- aceWidget example
-            divClass "ace-results" $ dynText aceValue
-            return ()
+            ace <- aceWidget example
+            divClass "ace-results" $ dynText $ aceValue ace
+            aceMoveCursor ace pos
+            return ace
             --textArea $ def & attributes .~ (constDyn $ "class" =: "code full-height")
             --               & textAreaConfig_initialValue .~ example
             --               & setValue .~ (exampleCode <$> newExample)
     --return $ Snippet (value ta)
-    return $ Snippet $ constDyn ""
+    return $ Snippet $ aceValue ace
   where
     example = unlines
       [ "app :: MonadWidget t m => App t m ()"
@@ -282,11 +301,14 @@ importDetails Explicit = do
     divClass "three wide field" $ textInput def
     return ()
 
+-- | Output of the right column
+data RightOutput t = RightOutput
+    { roErrorJump :: Event t (Int,Int)
+    }
 
-rightColumn :: MonadWidget t m => FrontendState t -> m ()
+rightColumn :: MonadWidget t m => FrontendState t -> m (RightOutput t)
 rightColumn fs = do
     divClass "right column full-height" $ rightTabs fs
-    return ()
 
 data OutputTab = AppTab | OutTab | PackagesTab
   deriving (Eq,Show,Ord,Enum)
@@ -311,7 +333,7 @@ instance MonadWidget t m => Tab t m OutputTab where
       (e,_) <- elDynAttr' "a" attrs (text $ showTab t)
       return $ domEvent Click e
 
-rightTabs :: MonadWidget t m => FrontendState t -> m ()
+rightTabs :: MonadWidget t m => FrontendState t -> m (RightOutput t)
 rightTabs fs = do
     let buildStatus = fsBuildStatus fs
     curTab <- divClass "ui top attached menu" $ do
@@ -320,13 +342,13 @@ rightTabs fs = do
     tabPane tabAttrs curTab AppTab $ do
       divClass "segment full-height" $ do
         widgetHoldHelper jsOutput NotBuilt $ updated buildStatus
-    tabPane tabAttrs curTab OutTab $ do
+    errorJump <- tabPane tabAttrs curTab OutTab $ do
       divClass "grey segment full-height console-out" $ do
         elAttr "div" incrAttrs $ buildMessagesWidget fs
     tabPane tabAttrs curTab PackagesTab $ do
       divClass "segment full-height console-out" $ do
         packagesTab fs
-    return ()
+    return $ RightOutput errorJump
   where
     incrAttrs = "class" =: "grey segment console-out" <>
                 "style" =: "height: 100%"
@@ -334,27 +356,31 @@ rightTabs fs = do
                "style" =: "height: calc(100% - 40px)"
 
 ------------------------------------------------------------------------------
-buildMessagesWidget :: MonadWidget t m => FrontendState t -> m ()
+buildMessagesWidget
+    :: MonadWidget t m
+    => FrontendState t
+    -> m (Event t (Int,Int))
 buildMessagesWidget fs = do
-    elClass "table" "ui compact table" $
+    ee <- elClass "table" "ui compact table" $
       el "tbody" $
         dyn =<< mapDyn (mapM buildMessageWidget) (fsBuildOut fs)
-    return ()
+    return . switch =<< hold never (leftmost <$> ee)
 
-buildMessageWidget :: MonadWidget t m => Either Text BuildMessage -> m ()
+buildMessageWidget
+    :: MonadWidget t m
+    => Either Text BuildMessage
+    -> m (Event t (Int,Int))
 buildMessageWidget (Left t) = do
     el "tr" $ do
       el "td" blank
       el "td" $ el "pre" $ text $ toS t
+    return never
 buildMessageWidget (Right bm) = do
     let klass = case _bmType bm of
                   BuildError -> "error"
                   BuildWarning -> "warning"
-        msg = printf "%s line %d, col %d: %s"
-                (over (element 0) toUpper klass) (_bmLine bm) (_bmCol bm)
-                (maybe "" (T.unpack . T.strip) $ atMay (_bmLines bm) 1)
     rec isOpen <- toggle False clk
-        clk <- elAttr "tr" ("class" =: klass) $ do
+        (clk, jump) <- elAttr "tr" ("class" =: klass) $ do
           (e, _) <- elAttr' "td" ("class" =: "collapsing" <>
                                "style" =: "cursor:pointer") $ do
             iconAttrs <- forDyn isOpen $ \open ->
@@ -362,8 +388,14 @@ buildMessageWidget (Right bm) = do
                  then ("class" =: "minus icon")
                  else ("class" =: "plus icon")
             elDynAttr "i" iconAttrs blank
-          el "td" $ el "pre" $ text msg
-          return $ domEvent Click e
+          lnk2 <- el "td" $ el "pre" $ do
+            lnk1 <- link $ printf "%s line %d, col %d"
+                             (over (element 0) toUpper klass)
+                             (_bmLine bm) (_bmCol bm)
+            text $ ": " <>
+              (maybe "" (T.unpack . T.strip) $ atMay (_bmLines bm) 1)
+            return lnk1
+          return (domEvent Click e, lnk2)
     attrs <- forDyn isOpen $ \open ->
       if open
         then ("class" =: klass)
@@ -371,6 +403,7 @@ buildMessageWidget (Right bm) = do
     elDynAttr "tr" attrs $ do
       elClass "td" "collapsing" blank
       el "td" $ el "pre" $ text (T.unpack $ T.unlines $ _bmLines bm)
+    return $ (_bmLine bm, _bmCol bm - 1) <$ _link_clicked jump
 
 jsOutput :: MonadWidget t m => BuildStatus -> m ()
 jsOutput NotBuilt = do
