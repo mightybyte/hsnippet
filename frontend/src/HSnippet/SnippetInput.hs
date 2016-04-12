@@ -49,7 +49,7 @@ activateSemUiDropdown :: String -> IO ()
 activateSemUiDropdown = js_activateSemUiDropdown . toJSString
 
 foreign import javascript unsafe
-  "$($1).dropdown();"
+  "$($1).dropdown({fullTextSearch: true});"
   js_activateSemUiDropdown :: JSString -> IO ()
 #else
 activateSemUiDropdown =
