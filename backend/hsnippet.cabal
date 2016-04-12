@@ -44,6 +44,7 @@ executable main
     snap-loader-static        >= 1.0  && < 1.1,
     snap-server               >= 1.0  && < 1.1,
     snaplet-postgresql-simple >= 1.0  && < 1.1,
+    split                     >= 0.2  && < 0.3,
     string-conv,
     text,
     time                      >= 1.4  && < 1.6,

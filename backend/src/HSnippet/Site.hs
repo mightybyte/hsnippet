@@ -164,9 +164,8 @@ buildAppState conf = do
     connstr <- getConnectionString cfg
     ghPool <- withPostgresqlPool (toS connstr) 3 return
 
-    ps <- getBuildEnvPackages
+    ps <- getPackageDump
     exs <- getExamples
-    mapM_ print exs
 
     return $ AppState ghPool ps exs
 

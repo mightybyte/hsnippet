@@ -11,7 +11,6 @@ module HSnippet.Lib
   ) where
 
 ------------------------------------------------------------------------------
-import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Reader
@@ -56,7 +55,7 @@ appMain appRootId app = runWebGUI $ \webView -> do
             Just t <- liftM (fmap castToHTMLElement) eventTarget
             n <- liftIO $ getTagName t
             return $ n `elem` [Just "INPUT", Just "SELECT", Just "TEXTAREA"]
-      liftIO $ (`on` keyDown) body $ do
+      _ <- liftIO $ (`on` keyDown) body $ do
         ke <- getKeyEvent
         absorbs <- eventTargetAbsorbsKeys
         when (ke == (key $ chr 8) && not absorbs) preventDefault

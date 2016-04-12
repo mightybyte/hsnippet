@@ -3,7 +3,7 @@
 , groundhog-postgresql, groundhog-th, heist, lens, monad-logger
 , mtl, postgresql-simple, process, random, readable, resource-pool
 , rng-utils, SHA, snap, snap-core, snap-loader-static, snap-server
-, snaplet-postgresql-simple, stdenv, string-conv, text, time
+, snaplet-postgresql-simple, split, stdenv, string-conv, text, time
 , transformers, websockets, websockets-snap
 }:
 mkDerivation {
@@ -17,7 +17,7 @@ mkDerivation {
     filepath fsnotify groundhog groundhog-postgresql groundhog-th heist
     lens monad-logger mtl postgresql-simple process random readable
     resource-pool rng-utils SHA snap snap-core snap-loader-static
-    snap-server snaplet-postgresql-simple string-conv text time
+    snap-server snaplet-postgresql-simple split string-conv text time
     transformers websockets websockets-snap
   ];
   description = "Haskell code snippet app";

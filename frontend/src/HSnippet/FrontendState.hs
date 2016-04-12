@@ -67,7 +67,7 @@ stateManager inData buildSnippet = do
           [ Up_GetPackages <$ pb
           , Up_GetExamples <$ pb
           , Up_RunSnippet . toS <$>
-              tagDyn (snippetCode inData) buildSnippet
+              tag (current $ snippetCode inData) buildSnippet
           ]
     (downEvent, _) <- openWebSocket upEvent
     buildStatus <- mkBuildStatus downEvent buildSnippet

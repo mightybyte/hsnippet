@@ -11,6 +11,7 @@ import           Control.Monad
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Maybe
 import           Data.Digest.Pure.SHA
+import           Data.List.Split
 import           Data.Monoid
 import           Data.String.Conv
 import qualified Data.Text            as T
@@ -78,6 +79,14 @@ getBuildEnvPackages = do
     let cp = (shell cmd) { cwd = Just buildRoot }
     (_, o, _) <- readCreateProcessWithExitCode cp ""
     return $ map (mkPackage . T.pack) $ filter (not . null) $ tail $ lines o
+
+getPackageDump :: IO [Package]
+getPackageDump = do
+    let cmd = nixShellCmd $ "ghcjs-pkg dump"
+    putStrLn $ "Getting packages and modules"
+    let cp = (shell cmd) { cwd = Just buildRoot }
+    (_, o, _) <- readCreateProcessWithExitCode cp ""
+    return $ map mkPackageFromDump $ splitOn ["---"] $ lines o
 
 buildSnippet
     :: (CreateProcess -> SnippetBlob -> Int -> IO (Bool, String, String))

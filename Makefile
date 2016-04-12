@@ -6,9 +6,13 @@ CSSDIR=static/css
 JSDIR=static/js
 
 JS=$(JSDIR)/jquery.min.js   \
-	 $(JSDIR)/semantic.min.js
+	 $(JSDIR)/semantic.min.js \
+	 $(JSDIR)/search.min.js \
+	 $(JSDIR)/dropdown.min.js
 
-CSS=$(CSSDIR)/semantic.min.css
+CSS=$(CSSDIR)/semantic.min.css \
+		$(CSSDIR)/search.min.css \
+		$(CSSDIR)/dropdown.min.css
 
 compile: app/static/app.css app/static/app.js
 

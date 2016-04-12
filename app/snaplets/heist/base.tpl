@@ -5,6 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 
+    <script src="/app.js"></script>
     <script src="/ace.js"></script>
     <link rel="stylesheet" type="text/css" href="/app.css">
     <link rel="stylesheet" type="text/css" href="/custom.css">
@@ -13,7 +14,5 @@
   </head>
   <body>
     <apply-content/>
-
-    <script src="/app.js"></script>
   </body>
 </html>
