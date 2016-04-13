@@ -27,17 +27,21 @@ import           System.Process
 import           HSnippet.Shared.OutputParser
 import           HSnippet.Shared.Types.BuildMessage
 import           HSnippet.Shared.Types.Package
+import           HSnippet.Shared.Types.SnippetContents
 import           HSnippet.Shared.WsApi
 import           HSnippet.Websocket
 ------------------------------------------------------------------------------
 
 data SnippetBlob = SnippetBlob
     { sbContents :: Text
+    , sbImports  :: Text
     , sbHash     :: Digest SHA1State
     }
 
-mkSnippetBlob :: Text -> SnippetBlob
-mkSnippetBlob t = SnippetBlob t (sha1 $ toS t)
+mkSnippetBlob :: SnippetContents -> SnippetBlob
+mkSnippetBlob sc = SnippetBlob (scCode sc) (scImports sc) (sha1 $ toS t)
+  where
+    t = scImports sc <> scCode sc
 
 buildRoot :: FilePath
 buildRoot = "userbuild"
@@ -90,7 +94,7 @@ getPackageDump = do
 
 buildSnippet
     :: (CreateProcess -> SnippetBlob -> Int -> IO (Bool, String, String))
-    -> Text
+    -> SnippetContents
     -> IO (String, Bool)
 buildSnippet runner snippet = do
     res <- runMaybeT $ do
@@ -99,9 +103,10 @@ buildSnippet runner snippet = do
           putStrLn $ "Building " ++ (sbRoot sb </> file)
           createDirectoryIfMissing True (sbRoot sb)
           let mainFile = sbRoot sb </> "Main.hs"
-          prefix <- T.readFile (buildRoot </> "template.hs")
+          header <- T.readFile (buildRoot </> "template.hs")
+          let prefix = T.unlines [header, sbImports sb, divider]
           let !fullSnippet = prefix <> T.unlines
-                [ snippet
+                [ sbContents sb
                 , "main :: IO ()"
                 , "main = appMain \"snippet-output\" app"
                 ]
@@ -120,6 +125,12 @@ buildSnippet runner snippet = do
     sb = mkSnippetBlob snippet
     file = sbName sb <.> "snippet"
     outDir = sbInnerRoot sb </> "dist"
+    divider = T.unlines
+      [ "import           HSnippet.Lib"
+      , ""
+      , "importAccessDenied :: Bool"
+      , "importAccessDenied = True"
+      ]
 
 ------------------------------------------------------------------------------
 runProcessIncremental

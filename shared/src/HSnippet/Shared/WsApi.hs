@@ -11,11 +11,12 @@ import HSnippet.Shared.Types.BuildMessage
 import HSnippet.Shared.Types.BuildResults
 import HSnippet.Shared.Types.ExampleSnippet
 import HSnippet.Shared.Types.Package
+import HSnippet.Shared.Types.SnippetContents
 ------------------------------------------------------------------------------
 
 data Up = Up_GetPackages
         | Up_GetExamples
-        | Up_RunSnippet Text
+        | Up_RunSnippet SnippetContents
   deriving (Eq, Ord, Show, Read)
 
 upSummary :: Up -> String

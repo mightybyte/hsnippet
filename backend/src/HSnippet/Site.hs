@@ -87,7 +87,6 @@ routes = [ ("login",       with auth handleLoginSubmit)
          , ("logout",      with auth handleLogout)
          , ("new_user",    with auth handleNewUser)
          , ("heistReload", failIfNotLocal $ with heist heistReloader)
-         , ("run",         ghcjsBuildHandler)
          , ("snippets",    serveDirectory "userbuild/snippets")
          , ("packages",    packagesHandler)
          , ("ws",          handleApi)
@@ -106,6 +105,8 @@ handleApi = do
   es <- asks (_appStateExamples . _appState)
   runWebSocketsSnap $ \pendingConn -> do
     conn <- acceptRequest pendingConn
+    putStrLn "Forking ping thread..."
+    forkPingThread conn 10
     forever $ do
       up <- wsReceive conn
       case up of

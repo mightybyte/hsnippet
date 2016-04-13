@@ -17,8 +17,8 @@ import           Control.Monad.Trans
 import           Data.Aeson
 import qualified Data.ByteString.Lazy as LBS
 import           Data.Monoid
-import           Data.String.Conv
 import           Data.Text (Text)
+import qualified Data.Text as T
 import           Reflex
 import           Reflex.Dom
 ------------------------------------------------------------------------------
@@ -26,11 +26,14 @@ import           HSnippet.Shared.Types.BuildMessage
 import           HSnippet.Shared.Types.BuildResults
 import           HSnippet.Shared.Types.ExampleSnippet
 import           HSnippet.Shared.Types.Package
+import           HSnippet.Shared.Types.SnippetContents
+import           HSnippet.Shared.Types.SnippetImport
 import           HSnippet.Shared.WsApi
 ------------------------------------------------------------------------------
 
 data Snippet t = Snippet
-    { snippetCode :: Dynamic t String
+    { snippetCode    :: Dynamic t String
+    , snippetImports :: Dynamic t [SnippetImport]
     }
 
 data BuildStatus = NotBuilt | Building | BuildFailed | Built BuildResults
@@ -63,11 +66,15 @@ stateManager
     -> m (FrontendState t)
 stateManager inData buildSnippet = do
     pb <- getPostBuild
+    let importBlock = T.unlines . map (T.pack . renderImport) <$>
+                      current (snippetImports inData)
+        inMsg = SnippetContents
+               <$> (T.pack <$> current (snippetCode inData))
+               <*> importBlock
     let upEvent = mergeWith (++) $ map (fmap (:[]))
           [ Up_GetPackages <$ pb
           , Up_GetExamples <$ pb
-          , Up_RunSnippet . toS <$>
-              tag (current $ snippetCode inData) buildSnippet
+          , Up_RunSnippet <$> tag inMsg buildSnippet
           ]
     (downEvent, _) <- openWebSocket upEvent
     buildStatus <- mkBuildStatus downEvent buildSnippet

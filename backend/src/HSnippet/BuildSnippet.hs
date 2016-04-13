@@ -8,17 +8,14 @@ import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.Trans
 import           Data.Aeson
-import           Data.String.Conv
-import           Data.Text (Text)
 import           Network.WebSockets
 import           Snap.Core
-import           Snap.Snaplet
 import           System.Directory
 import           System.Process
 ------------------------------------------------------------------------------
 import           HSnippet.BuildTypes
-import           HSnippet.Types.App
 import           HSnippet.Shared.Types.BuildResults
+import           HSnippet.Shared.Types.SnippetContents
 import           HSnippet.Shared.WsApi
 import           HSnippet.Websocket
 ------------------------------------------------------------------------------
@@ -28,21 +25,13 @@ writeJSON a = do
   modifyResponse $ setHeader "Content-Type" "application/json"
   writeLBS . encode $ a
 
-ghcjsBuildHandler :: Handler App App ()
-ghcjsBuildHandler = do
-    setTimeout 300
-    mbs <- getParam "snippet"
-    case decode . toS =<< mbs of
-      Just (String t) -> writeJSON =<< ghcjsBuilder runProcessBatch t
-      _ -> writeJSON $ String "<h2 class='red'>Error: no data</h2>"
-
 ghcjsBuilder
     :: MonadIO m
     => (CreateProcess -> SnippetBlob -> Int -> IO (Bool, String, String))
-    -> Text
+    -> SnippetContents
     -> m BuildResults
-ghcjsBuilder runner t = do
-    let sb = mkSnippetBlob t
+ghcjsBuilder runner sc = do
+    let sb = mkSnippetBlob sc
     (out, success) <- liftIO $ do
         exists <- doesDirectoryExist $ sbRoot sb
         putStrLn $ "Exists " ++ show exists ++ ": " ++ sbJsOut sb
@@ -52,15 +41,15 @@ ghcjsBuilder runner t = do
             success <- getSuccess sb
             when (not success) $ removeDirectoryRecursive $ sbRoot sb
             return (out, success)
-          else buildSnippet runner t
+          else buildSnippet runner sc
     let br = BuildResults (sbName sb) out success
     liftIO $ putStrLn $ "Returning " ++ show br
     return br
 
-handleRunSnippet :: Connection -> Text -> IO ()
-handleRunSnippet conn t = do
+handleRunSnippet :: Connection -> SnippetContents -> IO ()
+handleRunSnippet conn sc = do
     _ <- forkIO $ do
-      br <- ghcjsBuilder (runProcessIncremental conn) t
+      br <- ghcjsBuilder (runProcessIncremental conn) sc
       putStrLn "Sending Down_BuildFinished"
       wsSend conn $ Down_BuildFinished br
     return ()
