@@ -231,7 +231,6 @@ ghcjsBuildCmd sb outDir = unwords
     , sbInnerRoot sb </> "Main.hs"
     , "-O2"
     , "-Wall"
-    , "-fno-warn-unused-imports"
     , "-fno-warn-unused-do-bind"
     , "-fno-warn-orphans"
 --    , "&>"
