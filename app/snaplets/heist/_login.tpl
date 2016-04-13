@@ -17,7 +17,7 @@
   <div class="column">
     <h2 class="ui teal image header">
       <div class="content">
-        HSnippet Login
+        HSnippet
       </div>
     </h2>
     <bind tag="postAction">/login</bind>
@@ -26,6 +26,11 @@
 
     <div class="ui message">
       Don't have a login yet?  <a href="/new_user">Sign Up</a>
+    </div>
+
+    <div>
+      <div>sponsored by</div>
+      <img src="/ObsidianSystemsLogo.svg"/>
     </div>
   </div>
 </div>
