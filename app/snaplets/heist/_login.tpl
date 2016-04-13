@@ -30,7 +30,7 @@
 
     <div>
       <div>sponsored by</div>
-      <img src="/ObsidianSystemsLogo.svg"/>
+      <a target="_blank" href="https://obsidian.systems/"><img src="/ObsidianSystemsLogo.svg"/></a>
     </div>
   </div>
 </div>
