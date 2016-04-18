@@ -13,10 +13,20 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 ------------------------------------------------------------------------------
 
+newtype Export = Export { exportName :: Text }
+  deriving (Eq, Ord, Show, Read)
+
+newtype Module = Module { moduleName :: Text }
+  deriving (Eq, Ord, Show, Read)
+
+deriveJSON defaultOptions ''Export
+deriveJSON defaultOptions ''Module
+
 data Package = Package
-    { packageName :: Text
-    , packageVersion :: Text
-    , packageModules :: [Text]
+    { packageName      :: Text
+    , packageVersion   :: Text
+    , packageModules   :: [Module]
+    , packageLibDir    :: Maybe Text
     --, packageFields :: Map String [String]
     }
   deriving (Eq, Ord, Show, Read)
@@ -27,22 +37,17 @@ printPackage Package{..} = do
     print packageVersion
     print packageModules
 
-mkPackage :: Text -> Package
-mkPackage t = Package name ver [] --mempty
-  where
-    rev = T.reverse t
-    ver = T.reverse $ T.takeWhile (/= '-') rev
-    name = T.strip $ T.reverse $ T.tail $ T.dropWhile (/= '-') rev
-
 deriveJSON defaultOptions ''Package
 
 mkPackageFromDump :: [String] -> Package
-mkPackageFromDump pkgLines = Package (T.pack n) (T.pack v) ms --fieldMap
+mkPackageFromDump pkgLines = Package (T.pack n) (T.pack v) ms libDir
   where
     fs@((_,[n]):(_,[v]):_) = parsePkgInfo pkgLines
     fieldMap = M.fromList fs
-    ms = T.words $ T.unlines $ map T.pack $ filter (not . null) $
+    ms = map Module $ T.words $ T.unlines $ map T.pack $
+           filter (not . null) $
            fromMaybe [] $ M.lookup "exposed-modules" fieldMap
+    libDir = fmap T.pack . listToMaybe =<< M.lookup "library-dirs" fieldMap
 
 parsePkgInfo :: [String] -> [(String, [String])]
 parsePkgInfo [] = []

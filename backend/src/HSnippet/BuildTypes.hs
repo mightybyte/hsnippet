@@ -12,6 +12,7 @@ import           Control.Monad.Trans
 import           Control.Monad.Trans.Maybe
 import           Data.Digest.Pure.SHA
 import           Data.List.Split
+import           Data.Maybe
 import           Data.Monoid
 import           Data.String.Conv
 import qualified Data.Text            as T
@@ -76,13 +77,27 @@ hasBuildEnvironment = do
     myGuard True = return ()
     myGuard False = MaybeT $ return Nothing
 
-getBuildEnvPackages :: IO [Package]
-getBuildEnvPackages = do
-    let cmd = nixShellCmd "ghcjs-pkg list"
-    putStrLn "Getting packages in the snippet build environment"
+getModuleExports :: Text -> Module -> IO [Export]
+getModuleExports libDir m = do
+    let hiFile = T.unpack (T.replace "." "/" (moduleName m)) <.> "js_hi"
+    let hiPath = T.unpack libDir </> hiFile
+    let cmd = nixShellCmd $ "ghcjs --show-iface " <> hiPath
     let cp = (shell cmd) { cwd = Just buildRoot }
     (_, o, _) <- readCreateProcessWithExitCode cp ""
-    return $ map (mkPackage . T.pack) $ filter (not . null) $ tail $ lines o
+    let rawExports = filter (not . null) $ fromMaybe [] $
+                       lookup "exports" $ parsePkgInfo $ lines o
+        exports = concatMap (explodeConstructors . T.pack) rawExports
+    return $ map Export exports
+
+explodeConstructors :: Text -> [Text]
+explodeConstructors t =
+    if T.null args
+       then [t]
+       else (nm <> "(..)") :
+            (T.words $ T.dropEnd 1 $ T.drop 1 args)
+  where
+    (nm,args) = T.break (=='{') t
+
 
 getPackageDump :: IO [Package]
 getPackageDump = do

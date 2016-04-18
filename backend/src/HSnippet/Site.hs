@@ -10,12 +10,15 @@ module HSnippet.Site
 
 ------------------------------------------------------------------------------
 import           Control.Applicative
+import           Control.Error
 import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Data.ByteString (ByteString)
 import           Data.Configurator
 import           Data.Configurator.Types
+import           Data.Map (Map)
+import qualified Data.Map as M
 import           Data.String.Conv
 import qualified Data.Text as T
 import           Database.Groundhog
@@ -77,8 +80,8 @@ handleNewUser = method GET handleForm <|> method POST handleFormSubmit
         case res of
           Left e -> writeText $ T.pack $ "Error creating user: " ++ show e
           Right _ -> loginUser "login" "password" Nothing
-                               (\_ -> handleLogin err) (redirect "/")
-    err = Just "Unknown user or password"
+                               (\_ -> handleLogin $ Just "Unknown user or password")
+                               (redirect "/")
 
 ------------------------------------------------------------------------------
 -- | The application's routes.
@@ -90,9 +93,27 @@ routes = [ ("login",       with auth handleLoginSubmit)
          , ("snippets",    serveDirectory "userbuild/snippets")
          , ("packages",    packagesHandler)
          , ("ws",          handleApi)
+         , ("exports",     moduleExportsHandler)
          , ("",            serveDirectory "static")
          ]
 
+
+moduleExportsHandler :: Handler App App ()
+moduleExportsHandler = do
+    mm <- getParam "module"
+    case mm of
+      Nothing -> writeText "Must supply a module"
+      Just nm -> do
+        let m = Module $ toS nm
+        mem <- asks (_appStateModules . _appState)
+        es <- liftIO $ foo mem m
+        writeText $ T.unlines $ map exportName es
+
+foo :: Map Module [Package] -> Module -> IO [Export]
+foo mem m =
+    case packageLibDir =<< headMay (fromMaybe [] $ M.lookup m mem) of
+      Nothing -> return []
+      Just libDir -> getModuleExports libDir m
 
 packagesHandler :: Handler App App ()
 packagesHandler = do
@@ -103,6 +124,7 @@ handleApi :: Handler App App ()
 handleApi = do
   ps <- asks (_appStatePackages . _appState)
   es <- asks (_appStateExamples . _appState)
+  mem <- asks (_appStateModules . _appState)
   runWebSocketsSnap $ \pendingConn -> do
     conn <- acceptRequest pendingConn
     putStrLn "Forking ping thread..."
@@ -122,6 +144,11 @@ handleApi = do
         Right (Up_RunSnippet t) -> do
           liftIO $ putStrLn "Got Up_RunSnippet"
           handleRunSnippet conn t
+        Right (Up_GetExports m) -> do
+          liftIO $ putStrLn "Got Up_GetExports"
+          exports <- liftIO $ foo mem m
+          wsSend conn $ Down_Exports (m, exports)
+
       return ()
 
 
@@ -166,9 +193,13 @@ buildAppState conf = do
     ghPool <- withPostgresqlPool (toS connstr) 3 return
 
     ps <- getPackageDump
+    let ms = M.unionsWith (++) $ map packageToMap ps
     exs <- getExamples
 
-    return $ AppState ghPool ps exs
+    return $ AppState ghPool ps exs ms
+
+packageToMap :: Package -> Map Module [Package]
+packageToMap p = M.fromList $ map (\m -> (m, [p])) $ packageModules p
 
 ------------------------------------------------------------------------------
 -- | The application initializer.

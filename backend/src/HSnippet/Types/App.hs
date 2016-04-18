@@ -8,6 +8,7 @@ module HSnippet.Types.App where
 
 ------------------------------------------------------------------------------
 import Control.Lens
+import Data.Map (Map)
 import Data.Pool
 import Database.Groundhog.Core
 import Database.Groundhog.Postgresql
@@ -24,6 +25,7 @@ data AppState = AppState
     { _appStateDb       :: Pool Postgresql
     , _appStatePackages :: [Package]
     , _appStateExamples :: [ExampleSnippet]
+    , _appStateModules  :: Map Module [Package]
     }
 
 makeLenses ''AppState
