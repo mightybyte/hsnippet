@@ -130,7 +130,7 @@ mkMap :: [String] -> Map String String
 mkMap = M.fromList . map (\nm -> (nm, nm))
 
 packageToModules :: Package -> [(Maybe String, String)]
-packageToModules Package{..} = map p packageModules
+packageToModules Package{..} = map (p . moduleName) packageModules
   where
     p t = let n = toS t in (Just n, n)
 
