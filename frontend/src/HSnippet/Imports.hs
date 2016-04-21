@@ -22,9 +22,11 @@ import           Data.List
 import           Data.List.Split
 import           Data.Map (Map)
 import qualified Data.Map as M
+import           Data.Maybe
 import           Data.Monoid
 import           Data.Ord
 import           Data.String.Conv
+import qualified Data.Text as T
 import           GHCJS.DOM.Types hiding (Event, Text)
 #ifdef ghcjs_HOST_OS
 import           GHCJS.Types
@@ -34,6 +36,7 @@ import           Reflex.Dom
 import           Reflex.Dom.Contrib.Utils
 import           Safe
 ------------------------------------------------------------------------------
+import           HSnippet.FrontendState
 import           HSnippet.Shared.Types.Package
 import           HSnippet.Shared.Types.SnippetImport
 ------------------------------------------------------------------------------
@@ -83,14 +86,21 @@ defaultImports = M.fromList $ zip [0..]
     q m a = SnippetImport m (QualifiedName a)
     e m fs = SnippetImport m (ExplicitSymbols fs)
 
+data ImportsOut t = ImportsOut
+    { ioutImports       :: Dynamic t [SnippetImport]
+    , ioutRefresh       :: Event t ()
+    , ioutModuleUpdates :: Event t Module
+    }
+
 ------------------------------------------------------------------------------
 importsWidget
     :: MonadWidget t m
-    => Dynamic t [Package]
-    -> m (Dynamic t [SnippetImport])
-importsWidget packages = do
+    => FrontendState t
+    -> m (ImportsOut t)
+importsWidget fs = do
     divClass "ui small form" $ do
-      newImport <- importDropdown packages
+      let (newImport, refreshImports, moduleUpdates) = (never, never, never)
+      -- (newImport, refreshImports, moduleUpdates) <- importDropdown fs
       let order = sortBy (comparing importModuleName)
       let addNew i im = if M.null im
                           then M.singleton (0 :: Int) i
@@ -105,7 +115,8 @@ importsWidget packages = do
               dynText =<< mapDyn renderImport iDyn
               return $ domEvent Click minusEl
           let delImport = fmapMaybe id $ fmap fst . headMay . M.toList <$> res
-      mapDyn (order . M.elems) imports
+      sImports <- mapDyn (order . M.elems) imports
+      return $ ImportsOut sImports refreshImports moduleUpdates
 
 
 data ImportType = PlainImport
@@ -119,8 +130,8 @@ importTypeNames :: Map ImportType String
 importTypeNames = M.fromList
     [ (PlainImport, "plain")
     , (Qualified, "qualified")
---    , (Hiding, "hiding")
---    , (Explicit, "explicit")
+    , (Hiding, "hiding")
+    , (Explicit, "explicit")
     ]
 
 funcList :: [String]
@@ -156,44 +167,59 @@ semUiDropdown elId iv vals attrs = do
     d <- dropdown iv vals $ def &
       attributes .~ (constDyn $ attrs <> ("id" =: elId))
     pb <- getPostBuild
-    performEvent_ (liftIO (activateSemUiDropdown ('#':elId)) <$ pb)
+    let reactivate = leftmost [pb, () <$ updated vals]
+    performEvent_ (liftIO (activateSemUiDropdown ('#':elId)) <$ reactivate)
     return $ value d
 
 ------------------------------------------------------------------------------
 importDropdown
     :: MonadWidget t m
-    => Dynamic t [Package]
-    -> m (Event t SnippetImport)
-importDropdown ps = do
+    => FrontendState t
+    -> m (Event t SnippetImport, Event t (), Event t Module)
+importDropdown FrontendState{..} = do
     let initial = PlainImport
     divClass "fields" $ do
       rec attrs <- mapDyn mkAttrs $ value v
-          n <- elDynAttr "div" attrs $ do
-            el "label" $ text "Module Name"
-            mm <- mapDyn moduleMap ps
-            semUiDropdown "import-serach" Nothing mm
+          (n, refresh) <- elDynAttr "div" attrs $ do
+            clk <- el "label" $ do
+              text "Module Name"
+              (e,_) <- elAttr' "i" ("class" =: "refresh icon") blank
+              return $ domEvent Click e
+            mm <- mapDyn moduleMap fsPackages
+            res <- semUiDropdown "import-search" Nothing mm
               ("class" =: "ui search dropdown")
+            return (res, clk)
+          es <- holdDyn M.empty $ attachWith getExports
+                  (current fsModuleExports) (fmapMaybe id $ updated n)
           v <- divClass "three wide field" $ do
             el "label" $ text "Import Type"
             dropdown initial (constDyn importTypeNames) $
                      def & attributes .~ constDyn ("class" =: "ui fluid dropdown")
-          ie <- widgetHoldHelper (importDetails ps) initial (updated $ value v)
+          ie <- widgetHoldHelper (importDetails (constDyn mempty)) initial (updated $ value v)
+          --ie <- widgetHoldHelper (importDetails es) initial (updated $ value v)
           si <- combineDyn (\nm e -> SnippetImport <$> nm <*> pure e) n $
                            joinDyn ie
       clk <- divClass "one wide field" $ do
         elDynHtml' "label" $ constDyn "&nbsp;"
         (e,_) <- elAttr' "button" ("class" =: "ui icon button") $
-          elClass "i" "plus icon" $ blank
+          elClass "i" "plus icon" blank
         return $ domEvent Click e
-      return $ fmapMaybe id $ tagDyn si clk
+      return (fmapMaybe id $ tagDyn si clk, refresh, Module . toS <$> fmapMaybe id (updated n))
   where
     mkAttrs PlainImport = "class" =: "twelve wide field"
     mkAttrs Qualified = "class" =: "fourteen wide field"
     mkAttrs _ = "class" =: "eight wide field"
 
+getExports :: Map Module [Export] -> String -> Map String String
+getExports mm m = M.fromList $ map (\n -> (n,n)) ns
+  where
+    ns = T.unpack . exportName <$> fromMaybe [] es
+    es = M.lookup (Module $ T.pack m) mm
+
+
 importDetails
     :: MonadWidget t m
-    => Dynamic t [Package]
+    => Dynamic t (Map String String)
     -> ImportType
     -> m (Dynamic t ImportExtra)
 importDetails _ PlainImport = return (constDyn NoExtra)
@@ -201,16 +227,16 @@ importDetails _ Qualified = do
   divClass "two wide field" $ do
     el "label" $ text "As"
     mapDyn QualifiedName . value =<< textInput def
-importDetails _ Hiding = do
+importDetails exports Hiding = do
   divClass "four wide field" $ do
     el "label" $ text "Hiding"
-    v <- semUiDropdown "hiding-symbols" (head funcList) (constDyn $ mkMap funcList) $
+    v <- semUiDropdown "hiding-symbols" "" exports $
         ("multiple" =: " " <> "class" =: "ui fluid dropdown")
     mapDyn (HidingSymbols . splitOn "," . filter (not . isSpace)) v
-importDetails _ Explicit = do
+importDetails exports Explicit = do
   divClass "four wide field" $ do
     el "label" $ text "Symbols"
-    v <- semUiDropdown "explicit-symbols" (head funcList) (constDyn $ mkMap funcList) $
+    v <- semUiDropdown "explicit-symbols" "" exports $
              ("multiple" =: " " <> "class" =: "ui fluid dropdown")
     mapDyn (ExplicitSymbols . splitOn "," . filter (not . isSpace)) v
 

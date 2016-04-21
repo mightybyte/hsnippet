@@ -45,17 +45,18 @@ instance MonadWidget t m => Tab t m InputTab where
 ------------------------------------------------------------------------------
 leftColumn
     :: MonadWidget t m
-    => Dynamic t [Package]
+    => FrontendState t
     -> Event t ExampleSnippet
     -> Event t (Int,Int)
-    -> m (Snippet t)
-leftColumn pkgs newExample pos = do
+    -> m (LeftColumnOut t)
+leftColumn fs newExample pos = do
     divClass "left column full-height" $ do
       curTab <- divClass "ui top attached menu" $ do
         tabBar CodeTab [CodeTab, ImportsTab] never never
       code <- tabPane tabAttrs curTab CodeTab $ codeInput newExample pos
-      imports <- tabPane tabAttrs curTab ImportsTab (importsWidget pkgs)
-      return $ Snippet code imports
+      iOut <- tabPane tabAttrs curTab ImportsTab $ importsWidget fs
+      return $ LeftColumnOut code (ioutImports iOut) (ioutRefresh iOut)
+                             (ioutModuleUpdates iOut)
   where
     tabAttrs = "class" =: "ui bottom attached segment" <>
                "style" =: "height: calc(100% - 40px); overflow-y: auto"

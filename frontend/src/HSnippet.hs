@@ -51,7 +51,7 @@ runApp = do
     rec mData <- menu fs2
         fs2 <- elAttr "div" ("class" =: "ui two column padded grid" <>
                       "style" =: "height: calc(100% - 40px)") $ do
-          rec inData <- leftColumn (fsPackages fs1) (loadExample mData) (roErrorJump ro)
+          rec inData <- leftColumn fs1 (loadExample mData) (roErrorJump ro)
               fs1 <- stateManager inData (runEvent mData)
               ro <- rightColumn fs1
           return fs1
