@@ -175,36 +175,35 @@ importDropdown
     :: MonadWidget t m
     => FrontendState t
     -> m (Event t SnippetImport, Event t (), Event t Module)
-importDropdown FrontendState{..} = do
+importDropdown fs = do
     let initial = PlainImport
     divClass "fields" $ do
-      return (never, never, never)
-      --rec attrs <- mapDyn mkAttrs $ value v
-      --    (n, refresh) <- elDynAttr "div" attrs $ do
-      --      clk <- el "label" $ do
-      --        text "Module Name"
-      --        (e,_) <- elAttr' "i" ("class" =: "refresh icon") blank
-      --        return $ domEvent Click e
-      --      mm <- mapDyn moduleMap fsPackages
-      --      res <- semUiDropdown "import-search" Nothing mm
-      --        ("class" =: "ui search dropdown")
-      --      return (res, clk)
-      --    es <- holdDyn M.empty $ attachWith getExports
-      --            (current fsModuleExports) (fmapMaybe id $ updated n)
-      --    v <- divClass "three wide field" $ do
-      --      el "label" $ text "Import Type"
-      --      dropdown initial (constDyn importTypeNames) $
-      --               def & attributes .~ constDyn ("class" =: "ui fluid dropdown")
-      --    ie <- widgetHoldHelper (importDetails (constDyn mempty)) initial (updated $ value v)
-      --    --ie <- widgetHoldHelper (importDetails es) initial (updated $ value v)
-      --    si <- combineDyn (\nm e -> SnippetImport <$> nm <*> pure e) n $
-      --                     joinDyn ie
-      --clk <- divClass "one wide field" $ do
-      --  elDynHtml' "label" $ constDyn "&nbsp;"
-      --  (e,_) <- elAttr' "button" ("class" =: "ui icon button") $
-      --    elClass "i" "plus icon" blank
-      --  return $ domEvent Click e
-      --return (fmapMaybe id $ tagDyn si clk, refresh, Module . toS <$> fmapMaybe id (updated n))
+      rec attrs <- mapDyn mkAttrs $ value v
+          (n, refresh) <- elDynAttr "div" attrs $ do
+            clk <- el "label" $ do
+              text "Module Name"
+              (e,_) <- elAttr' "i" ("class" =: "refresh icon") blank
+              return $ domEvent Click e
+            mm <- mapDyn moduleMap (fsPackages fs)
+            res <- semUiDropdown "import-search" Nothing mm
+              ("class" =: "ui search dropdown")
+            return (res, clk)
+          es <- holdDyn M.empty $ attachWith getExports
+                  (current $ fsModuleExports fs) (fmapMaybe id $ updated n)
+          v <- divClass "three wide field" $ do
+            el "label" $ text "Import Type"
+            dropdown initial (constDyn importTypeNames) $
+                     def & attributes .~ constDyn ("class" =: "ui fluid dropdown")
+          ie <- widgetHoldHelper (importDetails (constDyn mempty)) initial (updated $ value v)
+          --ie <- widgetHoldHelper (importDetails es) initial (updated $ value v)
+          si <- combineDyn (\nm e -> SnippetImport <$> nm <*> pure e) n $
+                           joinDyn ie
+      clk <- divClass "one wide field" $ do
+        elDynHtml' "label" $ constDyn "&nbsp;"
+        (e,_) <- elAttr' "button" ("class" =: "ui icon button") $
+          elClass "i" "plus icon" blank
+        return $ domEvent Click e
+      return (fmapMaybe id $ tagDyn si clk, refresh, Module . toS <$> fmapMaybe id (updated n))
   where
     mkAttrs PlainImport = "class" =: "twelve wide field"
     mkAttrs Qualified = "class" =: "fourteen wide field"
