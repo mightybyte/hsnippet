@@ -16,6 +16,8 @@ import           Control.Lens
 import           Control.Monad.Trans
 import           Data.Aeson
 import qualified Data.ByteString.Lazy as LBS
+import           Data.Map (Map)
+import qualified Data.Map as M
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -31,19 +33,22 @@ import           HSnippet.Shared.Types.SnippetImport
 import           HSnippet.Shared.WsApi
 ------------------------------------------------------------------------------
 
-data Snippet t = Snippet
-    { snippetCode    :: Dynamic t String
-    , snippetImports :: Dynamic t [SnippetImport]
+data LeftColumnOut t = LeftColumnOut
+    { lcoCode           :: Dynamic t String
+    , lcoImports        :: Dynamic t [SnippetImport]
+    , lcoRefreshImports :: Event t ()
+    , lcoModuleUpdates  :: Event t Module
     }
 
 data BuildStatus = NotBuilt | Building | BuildFailed | Built BuildResults
   deriving (Eq,Show,Ord)
 
 data FrontendState t = FrontendState
-    { fsPackages    :: Dynamic t [Package]
-    , fsBuildStatus :: Dynamic t BuildStatus
-    , fsBuildOut    :: Dynamic t [Either Text BuildMessage]
-    , fsExamples    :: Dynamic t [ExampleSnippet]
+    { fsPackages      :: Dynamic t [Package]
+    , fsBuildStatus   :: Dynamic t BuildStatus
+    , fsBuildOut      :: Dynamic t [Either Text BuildMessage]
+    , fsExamples      :: Dynamic t [ExampleSnippet]
+    , fsModuleExports :: Dynamic t (Map Module [Export])
     }
 
 mkBuildStatus
@@ -61,20 +66,21 @@ mkBuildStatus downEvents buildSnippet = do
 
 stateManager
     :: MonadWidget t m
-    => Snippet t
+    => LeftColumnOut t
     -> Event t ()
     -> m (FrontendState t)
-stateManager inData buildSnippet = do
+stateManager lco buildSnippet = do
     pb <- getPostBuild
     let importBlock = T.unlines . map (T.pack . renderImport) <$>
-                      current (snippetImports inData)
+                      current (lcoImports lco)
         inMsg = SnippetContents
-               <$> (T.pack <$> current (snippetCode inData))
+               <$> (T.pack <$> current (lcoCode lco))
                <*> importBlock
     let upEvent = mergeWith (++) $ map (fmap (:[]))
-          [ Up_GetPackages <$ pb
+          [ Up_GetPackages <$ leftmost [pb, lcoRefreshImports lco]
           , Up_GetExamples <$ pb
           , Up_RunSnippet <$> tag inMsg buildSnippet
+          , Up_GetExports <$> lcoModuleUpdates lco
           ]
     (downEvent, _) <- openWebSocket upEvent
     buildStatus <- mkBuildStatus downEvent buildSnippet
@@ -84,7 +90,9 @@ stateManager inData buildSnippet = do
       [ (flip (++)) <$> fmapMaybe (isMsg _Down_BuildOutLine) downEvent
       , const [] <$ buildSnippet
       ]
-    return $ FrontendState packages buildStatus buildOut examples
+    exportMap <- foldDyn ($) M.empty $
+      uncurry M.insert <$> fmapMaybe (isMsg _Down_Exports) downEvent
+    return $ FrontendState packages buildStatus buildOut examples exportMap
 
 --foo :: Maybe Down -> Maybe [Package]
 isMsg :: Getting (First b) a b -> Maybe a -> Maybe b
