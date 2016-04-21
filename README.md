@@ -2,7 +2,7 @@
 
 ## TODO
 
-See the issue tracker at https://bitbucket.org/mightybyte/hsnippet/issues
+See the issue tracker at https://github.com/mightybyte/hsnippet/issues
 
 ## Developer Notes
 
