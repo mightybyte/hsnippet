@@ -99,7 +99,7 @@ importsWidget
     -> m (ImportsOut t)
 importsWidget fs = do
     divClass "ui small form" $ do
-      (newImport, refreshImports, moduleUpdates) <- importDropdown fs
+      (newImport, refreshImports, moduleUpdates) <- importInput fs
       let order = sortBy (comparing importModuleName)
       let addNew i im = if M.null im
                           then M.singleton (0 :: Int) i
@@ -163,20 +163,40 @@ semUiDropdown
     -> Map String [Char]
     -> m (Dynamic t a)
 semUiDropdown elId iv vals attrs = do
-    d <- dropdown iv vals $ def &
+    let f vs = semUiDropdown' elId iv vs attrs
+    res <- dyn =<< mapDyn f (traceDynWith (((elId ++ " values changed ") ++) . show . length) vals)
+    joinDyn <$> holdDyn (constDyn iv) res
+
+-- | Wrapper around the reflex-dom dropdown that calls the sem-ui dropdown
+-- function after the element is built.
+semUiDropdown'
+    :: (Ord a, Read a, Show a, MonadWidget t m)
+    => String
+       -- ^ Element id.  Ideally this should be randomly generated instead
+       -- of passed in as an argument, but for now this approach is easier.
+    -> a
+       -- ^ Initial value
+    -> Map a String
+    -> Map String [Char]
+    -> m (Dynamic t a)
+semUiDropdown' elId iv vals attrs = do
+    d <- dropdown iv (constDyn vals) $ def &
       attributes .~ (constDyn $ attrs <> ("id" =: elId))
     pb <- getPostBuild
-    let reactivate = leftmost [pb, () <$ updated vals]
-    performEvent_ (liftIO (activateSemUiDropdown ('#':elId)) <$ reactivate)
+    putDebugLn $ elId ++ " initialized with " ++ (show $ length vals) ++ " values"
+    performEvent_ (liftIO (activateSemUiDropdown ('#':elId)) <$ pb)
     return $ value d
 
+data ExportStatus = PendingExports String
+                  | ExportList (Map String String)
+
 ------------------------------------------------------------------------------
-importDropdown
+importInput
     :: MonadWidget t m
     => FrontendState t
     -> m (Event t SnippetImport, Event t (), Event t Module)
-importDropdown fs = do
-    let initial = PlainImport
+importInput fs = do
+    let initial = (PendingExports "", PlainImport)
     divClass "fields" $ do
       rec attrs <- mapDyn mkAttrs $ value v
           (n, refresh) <- elDynAttr "div" attrs $ do
@@ -188,13 +208,16 @@ importDropdown fs = do
             res <- semUiDropdown "import-search" Nothing mm
               ("class" =: "ui search dropdown")
             return (res, clk)
-          es <- holdDyn M.empty $ attachWith getExports
-                  (current $ fsModuleExports fs) (fmapMaybe id $ updated n)
+          es <- foldDyn ($) (PendingExports "") $ leftmost
+                  [ (\n _ -> PendingExports $ fromMaybe "" n) <$> updated n
+                  , getExports <$> updated (fsModuleExports fs)
+                  ]
           v <- divClass "three wide field" $ do
             el "label" $ text "Import Type"
-            dropdown initial (constDyn importTypeNames) $
+            dropdown (snd initial) (constDyn importTypeNames) $
                      def & attributes .~ constDyn ("class" =: "ui fluid dropdown")
-          ie <- widgetHoldHelper (importDetails es) initial (updated $ value v)
+          arg <- combineDyn (,) es $ value v
+          ie <- widgetHoldHelper (uncurry importDetails) initial (updated arg)
           si <- combineDyn (\nm e -> SnippetImport <$> nm <*> pure e) n $
                            joinDyn ie
       clk <- divClass "one wide field" $ do
@@ -208,16 +231,20 @@ importDropdown fs = do
     mkAttrs Qualified = "class" =: "fourteen wide field"
     mkAttrs _ = "class" =: "eight wide field"
 
-getExports :: Map Module [Export] -> String -> Map String String
-getExports mm m = M.fromList $ map (\n -> (n,n)) ns
+getExports :: Map Module [Export] -> ExportStatus -> ExportStatus
+getExports mm (PendingExports "") = PendingExports ""
+getExports mm (ExportList es) = ExportList es
+getExports mm (PendingExports m) =
+    case M.lookup (Module $ T.pack m) mm of
+      Nothing -> PendingExports m
+      Just es -> ExportList $ M.fromList $ map (tup . T.unpack . exportName) es
   where
-    ns = T.unpack . exportName <$> fromMaybe [] es
-    es = M.lookup (Module $ T.pack m) mm
+    tup n = (n,n)
 
 
 importDetails
     :: MonadWidget t m
-    => Dynamic t (Map String String)
+    => ExportStatus
     -> ImportType
     -> m (Dynamic t ImportExtra)
 importDetails _ PlainImport = return (constDyn NoExtra)
@@ -225,16 +252,61 @@ importDetails _ Qualified = do
   divClass "two wide field" $ do
     el "label" $ text "As"
     mapDyn QualifiedName . value =<< textInput def
-importDetails exports Hiding = do
+importDetails (PendingExports _) _ = do
   divClass "four wide field" $ do
     el "label" $ text "Hiding"
-    v <- semUiDropdown "hiding-symbols" "" exports $
+    v <- semUiDropdown "hiding-symbols" "" (constDyn mempty) $
+        ("multiple" =: " " <> "class" =: "ui loading fluid dropdown")
+    mapDyn (HidingSymbols . splitOn "," . filter (not . isSpace)) v
+importDetails (ExportList exports) Hiding = do
+  divClass "four wide field" $ do
+    el "label" $ text "Hiding"
+    v <- semUiDropdownMulti "hiding-symbols" "" (constDyn exports) $
         ("multiple" =: " " <> "class" =: "ui fluid dropdown")
     mapDyn (HidingSymbols . splitOn "," . filter (not . isSpace)) v
-importDetails exports Explicit = do
+importDetails (ExportList exports) Explicit = do
   divClass "four wide field" $ do
     el "label" $ text "Symbols"
-    v <- semUiDropdown "explicit-symbols" "" exports $
+    v <- semUiDropdownMulti "explicit-symbols" "" (constDyn exports) $
              ("multiple" =: " " <> "class" =: "ui fluid dropdown")
-    mapDyn (ExplicitSymbols . splitOn "," . filter (not . isSpace)) v
+    mapDyn (ExplicitSymbols . splitOn "," . filter (not . isSpace)) $ traceDyn "explicit" v
 
+-- Multi-select sem-ui dropdown is not working properly yet.  Not sure how
+-- to get the current value.
+
+-- | Wrapper around the reflex-dom dropdown that calls the sem-ui dropdown
+-- function after the element is built.
+semUiDropdownMulti
+    :: (Ord a, Read a, Show a, MonadWidget t m)
+    => String
+       -- ^ Element id.  Ideally this should be randomly generated instead
+       -- of passed in as an argument, but for now this approach is easier.
+    -> a
+       -- ^ Initial value
+    -> Dynamic t (Map a String)
+    -> Map String [Char]
+    -> m (Dynamic t String)
+semUiDropdownMulti elId iv vals attrs = do
+    let f vs = semUiDropdownMulti' elId iv vs attrs
+    res <- dyn =<< mapDyn f (traceDynWith (((elId ++ " values changed ") ++) . show . length) vals)
+    joinDyn <$> holdDyn (constDyn $ show iv) res
+
+-- | Wrapper around the reflex-dom dropdown that calls the sem-ui dropdown
+-- function after the element is built.
+semUiDropdownMulti'
+    :: (Ord a, Read a, Show a, MonadWidget t m)
+    => String
+       -- ^ Element id.  Ideally this should be randomly generated instead
+       -- of passed in as an argument, but for now this approach is easier.
+    -> a
+       -- ^ Initial value
+    -> Map a String
+    -> Map String [Char]
+    -> m (Dynamic t String)
+semUiDropdownMulti' elId iv vals attrs = do
+    d <- dropdown (show iv) (constDyn $ M.mapKeys show vals) $ def &
+      attributes .~ (constDyn $ attrs <> ("id" =: elId))
+    pb <- getPostBuild
+    putDebugLn $ elId ++ " initialized with " ++ (show $ length vals) ++ " values"
+    performEvent_ (liftIO (activateSemUiDropdown ('#':elId)) <$ pb)
+    return $ value d
