@@ -133,20 +133,20 @@ handleApi = do
       up <- wsReceive conn
       case up of
         Left e -> do
-          liftIO $ putStrLn $ "Websocket parse error: " ++ e
-          liftIO $ putStrLn $ "On message: " ++ show up
+          putStrLn $ "Websocket parse error: " ++ e
+          putStrLn $ "On message: " ++ show up
         Right Up_GetPackages -> do
-          liftIO $ putStrLn "Got Up_GetPackages"
+          putStrLn "Got Up_GetPackages"
           wsSend conn $ Down_Packages ps
         Right Up_GetExamples -> do
-          liftIO $ putStrLn "Got Up_GetExamples"
+          putStrLn "Got Up_GetExamples"
           wsSend conn $ Down_Examples es
         Right (Up_RunSnippet t) -> do
-          liftIO $ putStrLn "Got Up_RunSnippet"
+          putStrLn "Got Up_RunSnippet"
           handleRunSnippet conn t
         Right (Up_GetExports m) -> do
-          liftIO $ putStrLn "Got Up_GetExports"
-          exports <- liftIO $ foo mem m
+          putStrLn "Got Up_GetExports"
+          exports <- foo mem m
           wsSend conn $ Down_Exports (m, exports)
 
       return ()
