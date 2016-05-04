@@ -38,7 +38,7 @@ output in app so pages don't need to depend on a bunch of separate files.
     ./init-sandbox.sh
 
     # Build the backend
-    cd backend && cabal isntall --only-dependencies --force-reinstalls && cabal build
+    cd backend && cabal install --only-dependencies --force-reinstalls && cabal build
     cd ..
 
     # Build the frontend
