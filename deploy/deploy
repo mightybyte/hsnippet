@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -eux
+
+TARGET="$1"
+APP_CONFIG="$2"
+VERSION_INFO="$(
+  git -C .. rev-parse HEAD | tr -d '\n'
+  printf "%s" " "
+  date --utc '+%Y-%m-%dT%H:%M:%SZ'
+)"
+
+rm -fr ../userbuild/snippets
+RESULT="$(nix-build --no-out-link -j 1 -E '(import "${(import ../deps/reflex-platform/nixpkgs {}).path}/nixos" { configuration = import ./configuration.nix { hostname = "'"$TARGET"'"; hsnippetConfig = '"$APP_CONFIG"'; versionInfo = "'"$VERSION_INFO"'"; }; system = "x86_64-linux"; }).system' --show-trace)"
+
+nix-copy-closure --to root@"$TARGET" --gzip "$RESULT"
+ssh root@"$TARGET" bash -x -c "'nix-env -p /nix/var/nix/profiles/system --set $RESULT ; /nix/var/nix/profiles/system/bin/switch-to-configuration switch'"
