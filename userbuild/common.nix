@@ -20,6 +20,7 @@ haskellPackages.mkDerivation {
     hsnippet-lib
     http-types
     lens
+    linear
     monad-loops
     palette
     readable

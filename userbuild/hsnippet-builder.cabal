@@ -32,6 +32,7 @@ executable hsnippet-frontend
     , hsnippet-lib
     , http-types
     , lens
+    , linear
     , monad-loops
     , mtl
     , palette

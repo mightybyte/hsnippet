@@ -16,7 +16,6 @@ in (nixpkgs.pkgs.haskell.packages.${compiler}.override {
   overrides = self: super: {
     # Fixes
     QuickCheck = dontCheck super.QuickCheck;
-    aeson = dontCheck (overrideCabal super.aeson (drv: { version = "0.9.0.1"; sha256 = "1g7qdq7zpyvqwmh4sfhizqpb51cg24lrcj9vq5msz8k896y7vfcj"; }));
     attoparsec = dontCheck (overrideCabal super.attoparsec (drv: { version = "0.13.0.1"; sha256 = "0cprkr7bl4lrr80pz8mryb4rbfwdgpsrl7g0fbcaybhl8p5hm26f"; }));
     aws = dontCheck super.aws;
     blaze-builder = dontCheck (overrideCabal super.blaze-builder (drv: { version = "0.4.0.1"; sha256 = "1id3w33x9f7q5m3xpggmvzw03bkp94bpfyz81625bldqgf3yqdn1"; }));
